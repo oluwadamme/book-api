@@ -1,0 +1,43 @@
+@FirstApi_HostAddress = http://localhost:5246
+
+GET {{FirstApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
+
+GET {{FirstApi_HostAddress}}/
+Accept: application/json
+
+###
+
+GET {{FirstApi_HostAddress}}/api/books
+Accept: application/json
+
+###
+
+GET {{FirstApi_HostAddress}}/api/books/1
+Accept: application/json
+
+###
+POST {{FirstApi_HostAddress}}/api/books
+Content-Type: application/json
+
+{
+    "title": "Book 16",
+    "author": "Author 13",
+    "yearPublished": 2032
+}
+
+###
+PUT {{FirstApi_HostAddress}}/api/books/1
+Content-Type: application/json
+
+{
+    "title": "Book 13",
+    "author": "Author 13",
+    "yearPublished": 2032
+}
+
+###
+DELETE {{FirstApi_HostAddress}}/api/books/2
+Accept: application/json
