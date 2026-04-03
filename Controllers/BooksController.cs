@@ -1,12 +1,14 @@
 using Microsoft.AspNetCore.Mvc;
 using FirstApi.Models;
 using FirstApi.Data;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 
 namespace FirstApi.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class BooksController : ControllerBase
     {
         private readonly FirstApiContext _context;

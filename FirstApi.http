@@ -41,3 +41,23 @@ Content-Type: application/json
 ###
 DELETE {{FirstApi_HostAddress}}/api/books/2
 Accept: application/json
+
+###
+POST {{FirstApi_HostAddress}}/api/auth/register
+Content-Type: application/json
+
+{
+  "firstName": "John",
+  "lastName": "Doe",
+  "email": "john@example.com",
+  "password": "Password123!"
+}
+
+###
+POST {{FirstApi_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "john@example.com",
+  "password": "Password123!"
+}

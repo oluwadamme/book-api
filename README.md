@@ -1,6 +1,6 @@
-# 📚 FirstApi — ASP.NET Core Books REST API
+# 📚 FirstApi — ASP.NET Core Books REST API with JWT Authentication
 
-A RESTful Web API built with **ASP.NET Core (.NET 10)** that provides full CRUD operations for managing a collection of books. The API uses **Entity Framework Core** with **PostgreSQL** for data persistence and includes **OpenAPI/Swagger** documentation out of the box.
+A RESTful Web API built with **ASP.NET Core (.NET 10)** that provides full CRUD operations for managing a collection of books, secured with **JWT (JSON Web Token) authentication**. The API uses **Entity Framework Core** with **PostgreSQL** for data persistence and includes **OpenAPI/Swagger** documentation.
 
 ---
 
@@ -12,12 +12,15 @@ A RESTful Web API built with **ASP.NET Core (.NET 10)** that provides full CRUD 
 - [Prerequisites](#prerequisites)
 - [Getting Started](#getting-started)
   - [1. Clone the Repository](#1-clone-the-repository)
-  - [2. Configure the Database](#2-configure-the-database)
+  - [2. Configure the Database & JWT](#2-configure-the-database--jwt)
   - [3. Apply Migrations](#3-apply-migrations)
   - [4. Run the Application](#4-run-the-application)
 - [API Endpoints](#api-endpoints)
-  - [Books API](#books-api)
+  - [Authentication API](#authentication-api)
+  - [Books API (Protected)](#books-api-protected)
+- [Authentication Flow](#authentication-flow)
 - [Request & Response Examples](#request--response-examples)
+- [Password Requirements](#password-requirements)
 - [Seed Data](#seed-data)
 - [Configuration](#configuration)
 - [Potential Improvements](#potential-improvements)
@@ -27,12 +30,16 @@ A RESTful Web API built with **ASP.NET Core (.NET 10)** that provides full CRUD 
 
 ## Features
 
-- **Full CRUD API** — Create, Read, Update, and Delete book records via RESTful endpoints.
+- **JWT Authentication** — Secure register/login endpoints with BCrypt password hashing and JWT token generation.
+- **Protected Routes** — Books API requires a valid Bearer token to access.
+- **Full CRUD API** — Create, Read, Update, and Delete book records.
+- **Input Validation** — Email and password validation with strong password requirements.
+- **Standardized Responses** — All endpoints return a consistent `BaseResponse<T>` wrapper with `success`, `message`, and `data` fields.
 - **Entity Framework Core** — Code-first approach with migrations for database schema management.
-- **PostgreSQL** — Configured to use PostgreSQL as the relational database provider.
+- **PostgreSQL** — Configured to use PostgreSQL as the relational database.
 - **Seed Data** — Automatically populates the database with sample books on initial migration.
-- **OpenAPI / Swagger** — Auto-generated interactive API documentation available in development mode.
-- **Async Operations** — All database operations are fully asynchronous for better scalability.
+- **OpenAPI / Swagger** — Auto-generated API documentation available in development mode.
+- **Async Operations** — All database operations are fully asynchronous.
 
 ---
 
@@ -45,6 +52,8 @@ A RESTful Web API built with **ASP.NET Core (.NET 10)** that provides full CRUD 
 | Entity Framework Core | 10.0.5 | ORM / data access |
 | Npgsql (EF Core Provider) | 10.0.1 | PostgreSQL database driver |
 | PostgreSQL | 15+ | Relational database |
+| BCrypt.Net-Next | 4.1.0 | Password hashing |
+| JWT Bearer Authentication | 10.0.5 | Token-based authentication |
 | OpenAPI | 10.0.3 | API documentation |
 
 ---
@@ -54,18 +63,29 @@ A RESTful Web API built with **ASP.NET Core (.NET 10)** that provides full CRUD 
 ```
 FirstApi/
 ├── Controllers/
-│   └── BooksController.cs      # REST API controller with CRUD endpoints
+│   ├── AuthController.cs        # Authentication endpoints (register, login)
+│   └── BooksController.cs       # Books CRUD endpoints (protected)
 ├── Data/
-│   └── FirstApiContext.cs       # EF Core DbContext with seed data
+│   └── FirstApiContext.cs       # EF Core DbContext with seed data & User config
+├── DTOs/
+│   ├── AuthResponse.cs          # Login response (token, user info, expiration)
+│   ├── BaseResponse.cs          # Generic API response wrapper
+│   ├── LoginRequest.cs          # Login request body
+│   ├── RegisterRequest.cs       # Registration request body
+│   └── UserDto.cs               # User data without sensitive fields
 ├── Models/
-│   └── Books.cs                 # Book entity model
+│   ├── Books.cs                 # Book entity
+│   └── User.cs                  # User entity (Id, name, email, passwordHash)
+├── Services/
+│   └── AuthService.cs           # Auth business logic (register, login, JWT generation)
 ├── Properties/
 │   └── launchSettings.json      # Launch/debug profiles
-├── appsettings.json             # App configuration (connection strings, logging)
+├── appsettings.json             # App configuration (DB, JWT settings)
 ├── appsettings.Development.json # Development-specific overrides
-├── Program.cs                   # Application entry point & service configuration
+├── Program.cs                   # App entry point, middleware & DI configuration
 ├── FirstApi.csproj              # Project file with NuGet dependencies
 ├── FirstApi.sln                 # Solution file
+├── FirstApi.http                # HTTP request samples for testing
 └── README.md
 ```
 
@@ -73,11 +93,9 @@ FirstApi/
 
 ## Prerequisites
 
-Before running the project, ensure you have the following installed:
-
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - [PostgreSQL](https://www.postgresql.org/download/) (v15 or later recommended)
-- [EF Core CLI Tools](https://learn.microsoft.com/en-us/ef/core/cli/dotnet) — install globally with:
+- [EF Core CLI Tools](https://learn.microsoft.com/en-us/ef/core/cli/dotnet):
   ```bash
   dotnet tool install --global dotnet-ef
   ```
@@ -93,9 +111,9 @@ git clone <repository-url>
 cd FirstApi
 ```
 
-### 2. Configure the Database
+### 2. Configure the Database & JWT
 
-Create an `appsettings.json` file in the project root with your PostgreSQL connection string:
+Create an `appsettings.json` file in the project root:
 
 ```json
 {
@@ -108,25 +126,24 @@ Create an `appsettings.json` file in the project root with your PostgreSQL conne
   "AllowedHosts": "*",
   "ConnectionStrings": {
     "DefaultConnection": "Server=localhost;Port=5432;Database=first_api_db;Username=postgres;Password=YOUR_PASSWORD"
+  },
+  "Jwt": {
+    "Issuer": "https://localhost:7000",
+    "Audience": "https://localhost:7000",
+    "Key": "YourSuperSecretKeyThatIsAtLeast32CharactersLong!",
+    "ExpirationInMinutes": 60
   }
 }
 ```
 
-> ⚠️ **Note:** `appsettings.json` is excluded from version control. You must create this file locally with your own credentials.
+> ⚠️ **Note:** `appsettings.json` is excluded from version control. You must create this file locally with your own credentials and JWT secret key.
 
 ### 3. Apply Migrations
 
-Generate and apply the database schema:
-
 ```bash
-# Create a new migration (if Migrations folder doesn't exist)
 dotnet ef migrations add InitialCreate
-
-# Apply migrations to the database
 dotnet ef database update
 ```
-
-This will create the `first_api_db` database, the `Books` table, and seed it with sample data.
 
 ### 4. Run the Application
 
@@ -134,41 +151,122 @@ This will create the `first_api_db` database, the `Books` table, and seed it wit
 dotnet run
 ```
 
-The API will start on:
-- **HTTPS:** `https://localhost:5001`
-- **HTTP:** `http://localhost:5000`
-
-> Check `Properties/launchSettings.json` for the exact ports configured for your environment.
-
-In development mode, the OpenAPI documentation is available at:
+The API will start on the URL configured in `Properties/launchSettings.json`. In development mode, OpenAPI docs are available at:
 ```
-https://localhost:5001/openapi/v1.json
+https://localhost:<port>/openapi/v1.json
 ```
 
 ---
 
 ## API Endpoints
 
-### Books API
+### Authentication API
+
+Base URL: `/api/Auth`
+
+| Method | Endpoint | Description | Auth Required |
+|---|---|---|---|
+| `POST` | `/api/Auth/register` | Register a new user account | ❌ No |
+| `POST` | `/api/Auth/login` | Login and receive a JWT token | ❌ No |
+
+### Books API (Protected)
 
 Base URL: `/api/Books`
 
-| Method | Endpoint | Description | Success Code |
+> 🔒 All Books endpoints require a valid JWT token in the `Authorization` header.
+
+| Method | Endpoint | Description | Auth Required |
 |---|---|---|---|
-| `GET` | `/api/Books` | Retrieve all books | `200 OK` |
-| `GET` | `/api/Books/{id}` | Retrieve a single book by ID | `200 OK` |
-| `POST` | `/api/Books` | Create a new book | `201 Created` |
-| `PUT` | `/api/Books/{id}` | Update an existing book | `204 No Content` |
-| `DELETE` | `/api/Books/{id}` | Delete a book | `204 No Content` |
+| `GET` | `/api/Books` | Retrieve all books | ✅ Yes |
+| `GET` | `/api/Books/{id}` | Retrieve a single book by ID | ✅ Yes |
+| `POST` | `/api/Books` | Create a new book | ✅ Yes |
+| `PUT` | `/api/Books/{id}` | Update an existing book | ✅ Yes |
+| `DELETE` | `/api/Books/{id}` | Delete a book | ✅ Yes |
+
+---
+
+## Authentication Flow
+
+```
+1. Register → POST /api/Auth/register
+   └── Returns user info (no token)
+
+2. Login → POST /api/Auth/login
+   └── Returns JWT token + user info + expiration
+
+3. Access protected routes → GET /api/Books
+   └── Include header: Authorization: Bearer <your-token>
+```
 
 ---
 
 ## Request & Response Examples
 
-### Get All Books
+### Register a User
+
+```http
+POST /api/Auth/register
+Content-Type: application/json
+
+{
+  "firstName": "John",
+  "lastName": "Doe",
+  "email": "john@example.com",
+  "password": "Password123!"
+}
+```
+
+**Response** `200 OK`:
+```json
+{
+  "success": true,
+  "message": "User registered successfully",
+  "data": {
+    "id": 1,
+    "firstName": "John",
+    "lastName": "Doe",
+    "email": "john@example.com",
+    "createdAt": "2026-04-03T23:00:00Z",
+    "updatedAt": "2026-04-03T23:00:00Z"
+  }
+}
+```
+
+### Login
+
+```http
+POST /api/Auth/login
+Content-Type: application/json
+
+{
+  "email": "john@example.com",
+  "password": "Password123!"
+}
+```
+
+**Response** `200 OK`:
+```json
+{
+  "success": true,
+  "message": "User logged in successfully",
+  "data": {
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "id": 1,
+    "firstName": "John",
+    "lastName": "Doe",
+    "email": "john@example.com",
+    "createdAt": "2026-04-03T23:00:00Z",
+    "updatedAt": "2026-04-03T23:00:00Z",
+    "tokenExpiration": "2026-04-04T00:00:00Z"
+  }
+}
+```
+
+### Access Protected Route
 
 ```http
 GET /api/Books
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
 **Response** `200 OK`:
@@ -179,79 +277,35 @@ GET /api/Books
     "title": "The Great Gatsby",
     "author": "F. Scott Fitzgerald",
     "yearPublished": 1925
-  },
-  {
-    "id": 2,
-    "title": "To Kill a Mockingbird",
-    "author": "Harper Lee",
-    "yearPublished": 1960
   }
 ]
 ```
 
-### Get a Single Book
+**Without token** → `401 Unauthorized`
 
-```http
-GET /api/Books/1
-```
+### Error Response Example
 
-**Response** `200 OK`:
 ```json
 {
-  "id": 1,
-  "title": "The Great Gatsby",
-  "author": "F. Scott Fitzgerald",
-  "yearPublished": 1925
+  "success": false,
+  "message": "User already exists",
+  "data": null
 }
 ```
 
-**Response** `404 Not Found` — if the book doesn't exist.
+---
 
-### Create a Book
+## Password Requirements
 
-```http
-POST /api/Books
-Content-Type: application/json
+Passwords must meet all of the following criteria:
 
-{
-  "title": "Brave New World",
-  "author": "Aldous Huxley",
-  "yearPublished": 1932
-}
-```
-
-**Response** `201 Created`:
-```json
-{
-  "id": 4,
-  "title": "Brave New World",
-  "author": "Aldous Huxley",
-  "yearPublished": 1932
-}
-```
-
-### Update a Book
-
-```http
-PUT /api/Books/1
-Content-Type: application/json
-
-{
-  "title": "The Great Gatsby (Revised)",
-  "author": "F. Scott Fitzgerald",
-  "yearPublished": 1925
-}
-```
-
-**Response** `204 No Content`
-
-### Delete a Book
-
-```http
-DELETE /api/Books/1
-```
-
-**Response** `204 No Content`
+| Requirement | Rule |
+|---|---|
+| Minimum length | At least 6 characters |
+| Uppercase | At least one uppercase letter |
+| Lowercase | At least one lowercase letter |
+| Digit | At least one number |
+| Special character | At least one non-alphanumeric character (e.g., `!@#$%`) |
 
 ---
 
@@ -265,31 +319,33 @@ The database is pre-populated with the following books when migrations are appli
 | 2 | To Kill a Mockingbird | Harper Lee | 1960 |
 | 3 | 1984 | George Orwell | 1949 |
 
-Seed data is defined in [`Data/FirstApiContext.cs`](Data/FirstApiContext.cs) using EF Core's `HasData()` method.
-
 ---
 
 ## Configuration
 
 | Setting | Location | Description |
 |---|---|---|
-| Connection String | `appsettings.json` | PostgreSQL connection details |
-| Logging | `appsettings.json` | Log level configuration |
-| Launch Profiles | `Properties/launchSettings.json` | URLs, ports, and environment settings |
+| Connection String | `appsettings.json` → `ConnectionStrings.DefaultConnection` | PostgreSQL connection details |
+| JWT Secret Key | `appsettings.json` → `Jwt.Key` | Key used to sign JWT tokens (min 32 chars) |
+| JWT Issuer | `appsettings.json` → `Jwt.Issuer` | Token issuer for validation |
+| JWT Audience | `appsettings.json` → `Jwt.Audience` | Token audience for validation |
+| Token Expiry | `appsettings.json` → `Jwt.ExpirationInMinutes` | Token lifetime in minutes |
+| Logging | `appsettings.json` → `Logging` | Log level configuration |
 
 ---
 
 ## Potential Improvements
 
-- [ ] Add input validation with **Data Annotations** or **FluentValidation**
-- [ ] Implement **pagination, filtering, and sorting** on the `GET /api/Books` endpoint
-- [ ] Add **authentication & authorization** (e.g., JWT Bearer tokens)
-- [ ] Introduce a **Service/Repository layer** to separate business logic from the controller
-- [ ] Add **DTOs** (Data Transfer Objects) to decouple API contracts from entity models
+- [ ] Add **refresh tokens** for seamless token renewal
+- [ ] Implement **role-based authorization** (Admin, User)
+- [ ] Add **email verification** on registration
+- [ ] Implement **password reset** flow
+- [ ] Add a **Service/Repository layer** to separate concerns
 - [ ] Write **unit and integration tests** with xUnit
-- [ ] Add **Docker support** with a `docker-compose.yml` for the API and PostgreSQL
-- [ ] Implement **global error handling** middleware
+- [ ] Add **Docker support** with `docker-compose.yml`
+- [ ] Implement **global error handling middleware**
 - [ ] Add **API versioning**
+- [ ] Add **rate limiting** to prevent brute-force attacks
 - [ ] Set up **CI/CD** with GitHub Actions
 
 ---
