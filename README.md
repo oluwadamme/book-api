@@ -125,7 +125,7 @@ Create an `appsettings.json` file in the project root:
   },
   "AllowedHosts": "*",
   "ConnectionStrings": {
-    "DefaultConnection": "Server=localhost;Port=5432;Database=first_api_db;Username=postgres;Password=YOUR_PASSWORD"
+    "DefaultConnection": "Server=localhost;Port=5432;Database=namedb;Username=postgres;Password=YOUR_PASSWORD"
   },
   "Jwt": {
     "Issuer": "https://localhost:7000",
