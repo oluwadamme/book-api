@@ -1,5 +1,5 @@
 @FirstApi_HostAddress = http://localhost:5246
-
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkJlYXJlciJ9.eyJuYW1laWQiOiIxIiwiZW1haWwiOiJqb2huQGV4YW1wbGUuY29tIiwiZ2l2ZW5fbmFtZSI6IkpvaG4iLCJmYW1pbHlfbmFtZSI6IkRvZSIsIm5iZiI6MTc3NTMzNzMxOCwiZXhwIjoxNzc1MzQwOTE4LCJpYXQiOjE3NzUzMzczMTgsImlzcyI6Imh0dHBzOi8vbG9jYWxob3N0OjcwMDAiLCJhdWQiOiJodHRwczovL2xvY2FsaG9zdDo3MDAwIn0.jXwStNCcDs7ajaPDZizHNahWZlC09SzfrIRFsl8qZ_k
 GET {{FirstApi_HostAddress}}/weatherforecast/
 Accept: application/json
 
@@ -12,25 +12,29 @@ Accept: application/json
 
 GET {{FirstApi_HostAddress}}/api/books
 Accept: application/json
+Authorization: Bearer {{token}}
 
 ###
 
 GET {{FirstApi_HostAddress}}/api/books/1
 Accept: application/json
+Authorization: Bearer {{token}}
 
 ###
 POST {{FirstApi_HostAddress}}/api/books
 Content-Type: application/json
+Authorization: Bearer {{token}}
 
 {
-    "title": "Book 16",
-    "author": "Author 13",
-    "yearPublished": 2032
+    "title": "Book 2",
+    "author": "Author 3",
+    "yearPublished": 2200
 }
 
 ###
-PUT {{FirstApi_HostAddress}}/api/books/1
+PUT {{FirstApi_HostAddress}}/api/books/6
 Content-Type: application/json
+Authorization: Bearer {{token}}
 
 {
     "title": "Book 13",
@@ -39,8 +43,9 @@ Content-Type: application/json
 }
 
 ###
-DELETE {{FirstApi_HostAddress}}/api/books/2
+DELETE {{FirstApi_HostAddress}}/api/books/6
 Accept: application/json
+Authorization: Bearer {{token}}
 
 ###
 POST {{FirstApi_HostAddress}}/api/auth/register

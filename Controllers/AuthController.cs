@@ -1,5 +1,4 @@
 using FirstApi.DTOs;
-using FirstApi.Models;
 using FirstApi.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -7,21 +6,14 @@ namespace FirstApi.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class AuthController : ControllerBase
+public class AuthController(AuthService authService) : ControllerBase
 {
-    private readonly AuthService _authService;
-
-    public AuthController(AuthService authService)
-    {
-        _authService = authService;
-    }
-
     [HttpPost("register")]
     public async Task<ActionResult<BaseResponse<UserDto>>> RegisterUser(RegisterRequest request)
     {
         try
         {
-            var user = await _authService.RegisterUserAsync(request);
+            var user = await authService.RegisterUserAsync(request);
             
             return Ok(BaseResponse<UserDto>.SuccessResponse("User registered successfully", user));
         }
@@ -40,8 +32,8 @@ public class AuthController : ControllerBase
     {
         try
         {
-            
-            var response = await _authService.LoginUserAsync(request);
+
+            var response = await authService.LoginUserAsync(request);
             return Ok(BaseResponse<AuthResponse>.SuccessResponse("User logged in successfully", response));
         }
         catch (UnauthorizedAccessException e)
