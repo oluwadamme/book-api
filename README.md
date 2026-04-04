@@ -32,6 +32,7 @@ A RESTful Web API built with **ASP.NET Core (.NET 10)** that provides full CRUD 
 
 - **JWT Authentication** — Secure register/login endpoints with BCrypt password hashing and JWT token generation.
 - **Protected Routes** — Books API requires a valid Bearer token to access.
+- **Ownership-Based Access** — Users can only view, edit, and delete books they created.
 - **Full CRUD API** — Create, Read, Update, and Delete book records.
 - **Input Validation** — Email and password validation with strong password requirements.
 - **Standardized Responses** — All endpoints return a consistent `BaseResponse<T>` wrapper with `success`, `message`, and `data` fields.
@@ -64,7 +65,7 @@ A RESTful Web API built with **ASP.NET Core (.NET 10)** that provides full CRUD 
 FirstApi/
 ├── Controllers/
 │   ├── AuthController.cs        # Authentication endpoints (register, login)
-│   └── BooksController.cs       # Books CRUD endpoints (protected)
+│   └── BooksController.cs       # Books CRUD endpoints (protected, ownership-based)
 ├── Data/
 │   └── FirstApiContext.cs       # EF Core DbContext with seed data & User config
 ├── DTOs/
@@ -74,7 +75,7 @@ FirstApi/
 │   ├── RegisterRequest.cs       # Registration request body
 │   └── UserDto.cs               # User data without sensitive fields
 ├── Models/
-│   ├── Books.cs                 # Book entity
+│   ├── Books.cs                 # Book entity (linked to User via UserId)
 │   └── User.cs                  # User entity (Id, name, email, passwordHash)
 ├── Services/
 │   └── AuthService.cs           # Auth business logic (register, login, JWT generation)
@@ -169,19 +170,19 @@ Base URL: `/api/Auth`
 | `POST` | `/api/Auth/register` | Register a new user account | ❌ No |
 | `POST` | `/api/Auth/login` | Login and receive a JWT token | ❌ No |
 
-### Books API (Protected)
+### Books API (Protected — Ownership-Based)
 
 Base URL: `/api/Books`
 
-> 🔒 All Books endpoints require a valid JWT token in the `Authorization` header.
+> 🔒 All Books endpoints require a valid JWT token. Users can only access books they created.
 
 | Method | Endpoint | Description | Auth Required |
 |---|---|---|---|
-| `GET` | `/api/Books` | Retrieve all books | ✅ Yes |
-| `GET` | `/api/Books/{id}` | Retrieve a single book by ID | ✅ Yes |
-| `POST` | `/api/Books` | Create a new book | ✅ Yes |
-| `PUT` | `/api/Books/{id}` | Update an existing book | ✅ Yes |
-| `DELETE` | `/api/Books/{id}` | Delete a book | ✅ Yes |
+| `GET` | `/api/Books` | Retrieve all books owned by the logged-in user | ✅ Yes |
+| `GET` | `/api/Books/{id}` | Retrieve a single book by ID (must be owner) | ✅ Yes |
+| `POST` | `/api/Books` | Create a new book (auto-linked to logged-in user) | ✅ Yes |
+| `PUT` | `/api/Books/{id}` | Update a book (must be owner) | ✅ Yes |
+| `DELETE` | `/api/Books/{id}` | Delete a book (must be owner) | ✅ Yes |
 
 ---
 
@@ -262,7 +263,7 @@ Content-Type: application/json
 }
 ```
 
-### Access Protected Route
+### Get All Books (owned by logged-in user)
 
 ```http
 GET /api/Books
@@ -271,24 +272,60 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 **Response** `200 OK`:
 ```json
-[
-  {
-    "id": 1,
-    "title": "The Great Gatsby",
-    "author": "F. Scott Fitzgerald",
-    "yearPublished": 1925
-  }
-]
+{
+  "success": true,
+  "message": "Books fetched successfully",
+  "data": [
+    {
+      "id": 5,
+      "userId": 1,
+      "title": "The Great Gatsby",
+      "author": "F. Scott Fitzgerald",
+      "yearPublished": 1925
+    }
+  ]
+}
 ```
 
 **Without token** → `401 Unauthorized`
+
+### Create a Book
+
+```http
+POST /api/Books
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+{
+  "title": "Brave New World",
+  "author": "Aldous Huxley",
+  "yearPublished": 1932
+}
+```
+
+**Response** `201 Created`:
+```json
+{
+  "success": true,
+  "message": "Book created successfully",
+  "data": {
+    "id": 6,
+    "userId": 1,
+    "title": "Brave New World",
+    "author": "Aldous Huxley",
+    "yearPublished": 1932
+  }
+}
+```
+
+> **Note:** `userId` is automatically set from your JWT token — you don't need to include it in the request body.
 
 ### Error Response Example
 
 ```json
 {
   "success": false,
-  "message": "User already exists",
+  "message": "Book not found",
   "data": null
 }
 ```
