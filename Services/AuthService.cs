@@ -1,24 +1,24 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using FirstApi.Data;
 using FirstApi.Models;
 using FirstApi.DTOs;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Cryptography;
+using FirstApi.Services.Interfaces;
+using FirstApi.Repositories.Interfaces;
 
 namespace FirstApi.Services;
 
-public class AuthService
+public class AuthService : IAuthService
 {
-    private readonly FirstApiContext _context;
+    private readonly IAuthRepository _authRepository;
     private readonly IConfiguration _config;
-    private readonly EmailService _emailService;
+    private readonly IEmailService _emailService;
 
-    public AuthService(FirstApiContext context, IConfiguration config, EmailService emailService)
+    public AuthService(IAuthRepository authRepository, IConfiguration config, IEmailService emailService)
     {
-        _context = context;
+        _authRepository = authRepository;
         _config = config;
         _emailService = emailService;
     }
@@ -37,7 +37,7 @@ public class AuthService
         }
 
         // Check if user already exists
-        if (await _context.Users.AnyAsync(u => u.Email == request.Email))
+        if (await _authRepository.ExistsByEmailAsync(request.Email))
         {
             throw new ArgumentException("User already exists");
         }
@@ -60,8 +60,7 @@ public class AuthService
             EmailVerificationTokenExpiry = DateTime.UtcNow.AddMinutes(int.Parse(_config.GetSection("EmailVerification")["ExpirationInMinutes"]!))
         };
 
-        _context.Users.Add(user);
-        await _context.SaveChangesAsync();
+        await _authRepository.AddUserAsync(user);
         _ = _emailService.SendEmailAsync(request.Email, request.FirstName, subject, body);
 
         return new UserDto
@@ -85,7 +84,7 @@ public class AuthService
         {
             throw new ArgumentException(emailError);
         }
-        var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+        var user = await _authRepository.GetUserByEmailAsync(email);
         if (user == null)
         {
             return EmailVerificationStatus.UserNotFound;
@@ -100,17 +99,11 @@ public class AuthService
 
         user.EmailVerificationToken = emailVerificationToken;
         user.EmailVerificationTokenExpiry = DateTime.UtcNow.AddMinutes(int.Parse(_config.GetSection("EmailVerification")["ExpirationInMinutes"]!));
-        await _context.SaveChangesAsync();
+        await _authRepository.UpdateUserAsync(user);
         _ = _emailService.SendEmailAsync(user.Email, user.FirstName, subject, body);
         return EmailVerificationStatus.NotVerified;
     }
 
-    public enum EmailVerificationStatus
-    {
-        Verified,
-        NotVerified,
-        UserNotFound
-    }
 
     public async Task<bool> ForgotPasswordAsync(ForgetPasswordRequest request)
     {
@@ -120,7 +113,7 @@ public class AuthService
         {
             throw new ArgumentException(emailError);
         }
-        var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+        var user = await _authRepository.GetUserByEmailAsync(email);
         if (user == null)
         {
             return false;
@@ -132,7 +125,7 @@ public class AuthService
 
         user.PasswordResetToken = passwordResetToken;
         user.PasswordResetTokenExpiry = DateTime.UtcNow.AddMinutes(expirationInMinutes);
-        await _context.SaveChangesAsync();
+        await _authRepository.UpdateUserAsync(user);
         _ = _emailService.SendEmailAsync(user.Email, user.FirstName, subject, body);
         return true;
     }
@@ -149,7 +142,7 @@ public class AuthService
         {
             throw new ArgumentException(passwordError);
         }
-        var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+        var user = await _authRepository.GetUserByEmailAsync(request.Email);
         if (user == null)
         {
             return false;
@@ -161,7 +154,7 @@ public class AuthService
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
         user.PasswordResetToken = null;
         user.PasswordResetTokenExpiry = null;
-        await _context.SaveChangesAsync();
+        await _authRepository.UpdateUserAsync(user);
         return true;
     }
 
@@ -187,7 +180,7 @@ public class AuthService
             throw new ArgumentException("Token is required");
         }
 
-        var user = await _context.Users.FirstOrDefaultAsync(u => u.EmailVerificationToken == token && u.Email == email);
+        var user = await _authRepository.GetUserByEmailAndTokenAsync(email!, token!);
         if (user == null || user.EmailVerificationTokenExpiry < DateTime.UtcNow)
         {
             return false;
@@ -195,7 +188,7 @@ public class AuthService
         user.IsEmailVerified = true;
         user.EmailVerificationToken = null;
         user.EmailVerificationTokenExpiry = null;
-        await _context.SaveChangesAsync();
+        await _authRepository.UpdateUserAsync(user);
         return true;
     }
 
@@ -267,7 +260,7 @@ public class AuthService
             throw new ArgumentException("Invalid credentials");
         }
 
-        var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+        var user = await _authRepository.GetUserByEmailAsync(request.Email);
 
         if (user == null || !VerifyPassword(request.Password, user.PasswordHash))
         {

@@ -3,6 +3,9 @@ using FirstApi.Data;
 using Microsoft.EntityFrameworkCore;
 using FirstApi.Services;
 using Microsoft.IdentityModel.Tokens;
+using FirstApi.Repositories;
+using FirstApi.Services.Interfaces;
+using FirstApi.Repositories.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,8 +14,11 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
 builder.Services.AddControllers();
 
-builder.Services.AddScoped<AuthService>();
-builder.Services.AddScoped<EmailService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<IAuthRepository, AuthRepository>();
+builder.Services.AddScoped<IBookRepository, BookRepository>();
+builder.Services.AddScoped<IBookService, BookService>();
 
 builder.Services.AddAuthentication("Bearer").AddJwtBearer(options =>
 {

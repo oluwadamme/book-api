@@ -1,12 +1,12 @@
 using FirstApi.DTOs;
-using FirstApi.Services;
+using FirstApi.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FirstApi.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class AuthController(AuthService authService, ILogger<AuthController> logger) : ControllerBase
+public class AuthController(IAuthService authService, ILogger<AuthController> logger) : ControllerBase
 {
     [HttpPost("register")]
     public async Task<ActionResult<BaseResponse<UserDto>>> RegisterUser(RegisterRequest request)
@@ -79,7 +79,7 @@ public class AuthController(AuthService authService, ILogger<AuthController> log
         {
             var result = await authService.ResendEmailVerificationTokenAsync(request);
 
-            if (result == AuthService.EmailVerificationStatus.Verified)
+            if (result == EmailVerificationStatus.Verified)
             {
                 return BadRequest(BaseResponse<bool>.ErrorResponse("Email already verified"));
             }

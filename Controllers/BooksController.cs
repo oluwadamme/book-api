@@ -1,16 +1,15 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using FirstApi.Models;
-using FirstApi.Data;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.EntityFrameworkCore;
 using FirstApi.DTOs;
+using FirstApi.Services.Interfaces;
 namespace FirstApi.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
     [Authorize]
-    public class BooksController(FirstApiContext context) : ControllerBase
+    public class BooksController(IBookService bookService) : ControllerBase
     {
         // Helper method to get the logged-in user's ID from the JWT token
         private int GetUserId()
@@ -29,9 +28,7 @@ namespace FirstApi.Controllers
             try
             {
                 var userId = GetUserId();
-                var books = await context.Books
-                    .Where(b => b.UserId == userId)
-                    .ToListAsync();
+                var books = await bookService.GetAllBooksAsync(userId);
 
                 return Ok(BaseResponse<List<Book>>.SuccessResponse("Books fetched successfully", books));
             }
@@ -51,8 +48,7 @@ namespace FirstApi.Controllers
             try
             {
                 var userId = GetUserId();
-                var book = await context.Books
-                    .FirstOrDefaultAsync(b => b.Id == id && b.UserId == userId);
+                var book = await bookService.GetBookByIdAsync(id, userId);
 
                 if (book == null)
                 {
@@ -73,19 +69,13 @@ namespace FirstApi.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<BaseResponse<Book>>> CreateBook(Book? newBook)
+        public async Task<ActionResult<BaseResponse<Book>>> CreateBook(Book newBook)
         {
             try
             {
-                if (newBook == null)
-                {
-                    return BadRequest(BaseResponse<Book>.ErrorResponse("Book data is required"));
-                }
-
-                newBook.UserId = GetUserId();
-                context.Books.Add(newBook);
-                await context.SaveChangesAsync();
-                return CreatedAtAction(nameof(GetBook), new { id = newBook.Id }, BaseResponse<Book>.SuccessResponse("Book created successfully", newBook));
+                var userId = GetUserId();
+                var book = await bookService.AddBookAsync(newBook, userId);
+                return CreatedAtAction(nameof(GetBook), new { id = book.Id }, BaseResponse<Book>.SuccessResponse("Book created successfully", book));
             }
             catch (ArgumentException e)
             {
@@ -99,28 +89,12 @@ namespace FirstApi.Controllers
         }
 
         [HttpPut("{id}")]
-        public async Task<ActionResult<BaseResponse<string>>> UpdateBook(int id, Book? book)
+        public async Task<ActionResult<BaseResponse<string>>> UpdateBook(int id, Book book)
         {
             try
             {
-                if (book == null)
-                {
-                    return BadRequest(BaseResponse<string>.ErrorResponse("Book data is required"));
-                }
-
                 var userId = GetUserId();
-                var existingBook = await context.Books
-                    .FirstOrDefaultAsync(b => b.Id == id && b.UserId == userId);
-
-                if (existingBook == null)
-                {
-                    return NotFound(BaseResponse<string>.ErrorResponse("Book not found"));
-                }
-
-                existingBook.Title = book.Title;
-                existingBook.Author = book.Author;
-                existingBook.YearPublished = book.YearPublished;
-                await context.SaveChangesAsync();
+                await bookService.UpdateBookAsync(id, book, userId);
                 return Ok(BaseResponse<string>.SuccessResponse("Book updated successfully", "Book updated successfully"));
             }
             catch (ArgumentException e)
@@ -140,16 +114,7 @@ namespace FirstApi.Controllers
             try
             {
                 var userId = GetUserId();
-                var book = await context.Books
-                    .FirstOrDefaultAsync(b => b.Id == id && b.UserId == userId);
-
-                if (book == null)
-                {
-                    return NotFound(BaseResponse<string>.ErrorResponse("Book not found"));
-                }
-
-                context.Books.Remove(book);
-                await context.SaveChangesAsync();
+                await bookService.DeleteBookAsync(id, userId);
                 return Ok(BaseResponse<string>.SuccessResponse("Book deleted successfully", "Book deleted successfully"));
             }
             catch (ArgumentException e)

@@ -1,6 +1,6 @@
 @FirstApi_HostAddress = http://localhost:5246
 @email = adeniyidamilola246@gmail.com
-@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkJlYXJlciJ9.eyJuYW1laWQiOiIxIiwiZW1haWwiOiJqb2huQGV4YW1wbGUuY29tIiwiZ2l2ZW5fbmFtZSI6IkpvaG4iLCJmYW1pbHlfbmFtZSI6IkRvZSIsIm5iZiI6MTc3NTMzNzMxOCwiZXhwIjoxNzc1MzQwOTE4LCJpYXQiOjE3NzUzMzczMTgsImlzcyI6Imh0dHBzOi8vbG9jYWxob3N0OjcwMDAiLCJhdWQiOiJodHRwczovL2xvY2FsaG9zdDo3MDAwIn0.jXwStNCcDs7ajaPDZizHNahWZlC09SzfrIRFsl8qZ_k
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkJlYXJlciJ9.eyJuYW1laWQiOiIxIiwiZW1haWwiOiJqb2huQGV4YW1wbGUuY29tIiwiZ2l2ZW5fbmFtZSI6IkpvaG4iLCJmYW1pbHlfbmFtZSI6IkRvZSIsIm5iZiI6MTc3NTUxOTE1MiwiZXhwIjoxNzc1NTIyNzUyLCJpYXQiOjE3NzU1MTkxNTIsImlzcyI6Imh0dHBzOi8vbG9jYWxob3N0OjcwMDAiLCJhdWQiOiJodHRwczovL2xvY2FsaG9zdDo3MDAwIn0.MBEH09m8RLXbkZBuybZ8wRJLDMp9cgr8wMhQDVIqVr0
 GET {{FirstApi_HostAddress}}/weatherforecast/
 Accept: application/json
 
@@ -17,7 +17,7 @@ Authorization: Bearer {{token}}
 
 ###
 
-GET {{FirstApi_HostAddress}}/api/books/1
+GET {{FirstApi_HostAddress}}/api/books/7
 Accept: application/json
 Authorization: Bearer {{token}}
 
@@ -27,20 +27,20 @@ Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
-    "title": "Book 2",
-    "author": "Author 3",
-    "yearPublished": 2200
+    "title": "Book 12",
+    "author": "Author 55",
+    "yearPublished": 2009
 }
 
 ###
-PUT {{FirstApi_HostAddress}}/api/books/6
+PUT {{FirstApi_HostAddress}}/api/books/7
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
-    "title": "Book 13",
+    "title": "Book 3",
     "author": "Author 13",
-    "yearPublished": 2032
+    "yearPublished": 2002
 }
 
 ###

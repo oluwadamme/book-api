@@ -31,11 +31,14 @@ A RESTful Web API built with **ASP.NET Core (.NET 10)** that provides full CRUD 
 ## Features
 
 - **JWT Authentication** — Secure register/login endpoints with BCrypt password hashing and JWT token generation.
+- **Email Verification** — OTP-based email verification on registration via SMTP (MailKit). Emails are sent fire-and-forget for fast responses.
+- **Password Reset** — Forgot password and reset password flow with time-limited OTP tokens.
 - **Protected Routes** — Books API requires a valid Bearer token to access.
 - **Ownership-Based Access** — Users can only view, edit, and delete books they created.
 - **Full CRUD API** — Create, Read, Update, and Delete book records.
 - **Input Validation** — Email and password validation with strong password requirements.
 - **Standardized Responses** — All endpoints return a consistent `BaseResponse<T>` wrapper with `success`, `message`, and `data` fields.
+- **Structured Logging** — `ILogger<T>` used across controllers and services for structured error and info logging.
 - **Entity Framework Core** — Code-first approach with migrations for database schema management.
 - **PostgreSQL** — Configured to use PostgreSQL as the relational database.
 - **Seed Data** — Automatically populates the database with sample books on initial migration.
@@ -54,6 +57,7 @@ A RESTful Web API built with **ASP.NET Core (.NET 10)** that provides full CRUD 
 | Npgsql (EF Core Provider) | 10.0.1 | PostgreSQL database driver |
 | PostgreSQL | 15+ | Relational database |
 | BCrypt.Net-Next | 4.1.0 | Password hashing |
+| MailKit | 4.15.1 | Email sending (SMTP) |
 | JWT Bearer Authentication | 10.0.5 | Token-based authentication |
 | OpenAPI | 10.0.3 | API documentation |
 
@@ -64,24 +68,28 @@ A RESTful Web API built with **ASP.NET Core (.NET 10)** that provides full CRUD 
 ```
 FirstApi/
 ├── Controllers/
-│   ├── AuthController.cs        # Authentication endpoints (register, login)
+│   ├── AuthController.cs        # Auth endpoints (register, login, verify, reset)
 │   └── BooksController.cs       # Books CRUD endpoints (protected, ownership-based)
 ├── Data/
 │   └── FirstApiContext.cs       # EF Core DbContext with seed data & User config
 ├── DTOs/
 │   ├── AuthResponse.cs          # Login response (token, user info, expiration)
 │   ├── BaseResponse.cs          # Generic API response wrapper
+│   ├── ForgetPasswordRequest.cs # Forgot password request body
 │   ├── LoginRequest.cs          # Login request body
 │   ├── RegisterRequest.cs       # Registration request body
-│   └── UserDto.cs               # User data without sensitive fields
+│   ├── ResetPasswordRequest.cs  # Reset password request body (email, token, password)
+│   ├── UserDto.cs               # User data without sensitive fields
+│   └── VerifyEmailRequest.cs    # Email verification request body (email, token)
 ├── Models/
 │   ├── Books.cs                 # Book entity (linked to User via UserId)
-│   └── User.cs                  # User entity (Id, name, email, passwordHash)
+│   └── User.cs                  # User entity with verification & reset token fields
 ├── Services/
-│   └── AuthService.cs           # Auth business logic (register, login, JWT generation)
+│   ├── AuthService.cs           # Auth logic (register, login, verify, reset, JWT)
+│   └── EmailService.cs          # SMTP email sending via MailKit (fire-and-forget)
 ├── Properties/
 │   └── launchSettings.json      # Launch/debug profiles
-├── appsettings.json             # App configuration (DB, JWT settings)
+├── appsettings.json             # App configuration (DB, JWT, SMTP settings)
 ├── appsettings.Development.json # Development-specific overrides
 ├── Program.cs                   # App entry point, middleware & DI configuration
 ├── FirstApi.csproj              # Project file with NuGet dependencies
@@ -133,6 +141,16 @@ Create an `appsettings.json` file in the project root:
     "Audience": "https://localhost:7000",
     "Key": "YourSuperSecretKeyThatIsAtLeast32CharactersLong!",
     "ExpirationInMinutes": 60
+  },
+  "EmailVerification": {
+    "ExpirationInMinutes": 15
+  },
+  "EmailSettings": {
+    "SmtpServer": "smtp.gmail.com",
+    "SmtpPort": 587,
+    "SenderEmail": "your-email@gmail.com",
+    "SenderName": "BookApi",
+    "Password": "your-app-password"
   }
 }
 ```
@@ -167,8 +185,12 @@ Base URL: `/api/Auth`
 
 | Method | Endpoint | Description | Auth Required |
 |---|---|---|---|
-| `POST` | `/api/Auth/register` | Register a new user account | ❌ No |
+| `POST` | `/api/Auth/register` | Register a new user (sends verification OTP) | ❌ No |
 | `POST` | `/api/Auth/login` | Login and receive a JWT token | ❌ No |
+| `POST` | `/api/Auth/verify-email` | Verify email with OTP code | ❌ No |
+| `POST` | `/api/Auth/resend-email-verification-token` | Resend verification OTP | ❌ No |
+| `POST` | `/api/Auth/forgot-password` | Request a password reset OTP | ❌ No |
+| `POST` | `/api/Auth/reset-password` | Reset password with OTP code | ❌ No |
 
 ### Books API (Protected — Ownership-Based)
 
@@ -190,13 +212,26 @@ Base URL: `/api/Books`
 
 ```
 1. Register → POST /api/Auth/register
-   └── Returns user info (no token)
+   └── Returns user info + sends verification OTP to email
 
-2. Login → POST /api/Auth/login
+2. Verify Email → POST /api/Auth/verify-email
+   └── Submit OTP from email to verify account
+
+3. Login → POST /api/Auth/login
    └── Returns JWT token + user info + expiration
 
-3. Access protected routes → GET /api/Books
+4. Access protected routes → GET /api/Books
    └── Include header: Authorization: Bearer <your-token>
+```
+
+### Password Reset Flow
+
+```
+1. Forgot Password → POST /api/Auth/forgot-password
+   └── Sends reset OTP to email (always returns 200)
+
+2. Reset Password → POST /api/Auth/reset-password
+   └── Submit OTP + new password to reset
 ```
 
 ---
@@ -227,9 +262,33 @@ Content-Type: application/json
     "firstName": "John",
     "lastName": "Doe",
     "email": "john@example.com",
+    "isEmailVerified": false,
     "createdAt": "2026-04-03T23:00:00Z",
     "updatedAt": "2026-04-03T23:00:00Z"
   }
+}
+```
+
+> A 4-digit OTP is sent to the user's email for verification.
+
+### Verify Email
+
+```http
+POST /api/Auth/verify-email
+Content-Type: application/json
+
+{
+  "email": "john@example.com",
+  "token": "7598"
+}
+```
+
+**Response** `200 OK`:
+```json
+{
+  "success": true,
+  "message": "Email verified successfully",
+  "data": true
 }
 ```
 
@@ -256,10 +315,53 @@ Content-Type: application/json
     "firstName": "John",
     "lastName": "Doe",
     "email": "john@example.com",
+    "isEmailVerified": true,
     "createdAt": "2026-04-03T23:00:00Z",
     "updatedAt": "2026-04-03T23:00:00Z",
     "tokenExpiration": "2026-04-04T00:00:00Z"
   }
+}
+```
+
+### Forgot Password
+
+```http
+POST /api/Auth/forgot-password
+Content-Type: application/json
+
+{
+  "email": "john@example.com"
+}
+```
+
+**Response** `200 OK` (always, regardless of whether email exists):
+```json
+{
+  "success": true,
+  "message": "Password reset token sent successfully",
+  "data": true
+}
+```
+
+### Reset Password
+
+```http
+POST /api/Auth/reset-password
+Content-Type: application/json
+
+{
+  "email": "john@example.com",
+  "token": "4821",
+  "password": "NewPassword123!"
+}
+```
+
+**Response** `200 OK`:
+```json
+{
+  "success": true,
+  "message": "Password reset successfully",
+  "data": true
 }
 ```
 
@@ -367,16 +469,20 @@ The database is pre-populated with the following books when migrations are appli
 | JWT Issuer | `appsettings.json` → `Jwt.Issuer` | Token issuer for validation |
 | JWT Audience | `appsettings.json` → `Jwt.Audience` | Token audience for validation |
 | Token Expiry | `appsettings.json` → `Jwt.ExpirationInMinutes` | Token lifetime in minutes |
+| SMTP Server | `appsettings.json` → `EmailSettings.SmtpServer` | Email server (e.g., `smtp.gmail.com`) |
+| SMTP Port | `appsettings.json` → `EmailSettings.SmtpPort` | SMTP port (587 for TLS) |
+| Sender Email | `appsettings.json` → `EmailSettings.SenderEmail` | Email address to send from |
+| Sender Password | `appsettings.json` → `EmailSettings.Password` | App password for SMTP auth |
+| OTP Expiry | `appsettings.json` → `EmailVerification.ExpirationInMinutes` | OTP token lifetime in minutes |
 | Logging | `appsettings.json` → `Logging` | Log level configuration |
 
 ---
 
 ## Potential Improvements
 
+- [x] Add **email verification** on registration
+- [x] Implement **password reset** flow
 - [ ] Add **refresh tokens** for seamless token renewal
-- [ ] Implement **role-based authorization** (Admin, User)
-- [ ] Add **email verification** on registration
-- [ ] Implement **password reset** flow
 - [ ] Add a **Service/Repository layer** to separate concerns
 - [ ] Write **unit and integration tests** with xUnit
 - [ ] Add **Docker support** with `docker-compose.yml`

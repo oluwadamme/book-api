@@ -1,42 +1,43 @@
 using MailKit.Net.Smtp;
 using MimeKit;
+using FirstApi.Services.Interfaces;
 
 namespace FirstApi.Services;
 
-public class EmailService(IConfiguration config, ILogger<EmailService> logger)
+public class EmailService(IConfiguration config, ILogger<EmailService> logger) : IEmailService
 {
     public async Task SendEmailAsync(string email, string name, string subject, string body)
     {
         try
         {
-        var emailSettings = config.GetSection("EmailSettings");
-        var smtpServer = emailSettings["SmtpServer"];
-        var smtpPort = int.Parse(emailSettings["SmtpPort"]!);
-        var senderEmail = emailSettings["SenderEmail"]!;
-        var senderName = emailSettings["SenderName"];
-        var password = emailSettings["Password"]!;
+            var emailSettings = config.GetSection("EmailSettings");
+            var smtpServer = emailSettings["SmtpServer"];
+            var smtpPort = int.Parse(emailSettings["SmtpPort"]!);
+            var senderEmail = emailSettings["SenderEmail"]!;
+            var senderName = emailSettings["SenderName"];
+            var password = emailSettings["Password"]!;
 
-        var message = new MimeMessage();
-        message.From.Add(new MailboxAddress(senderName, senderEmail));
-        message.To.Add(new MailboxAddress(name, email));
-        message.Subject = subject;
+            var message = new MimeMessage();
+            message.From.Add(new MailboxAddress(senderName, senderEmail));
+            message.To.Add(new MailboxAddress(name, email));
+            message.Subject = subject;
 
-        message.Body = new TextPart("plain")
-        {
-            Text = $@"Hey {name},
+            message.Body = new TextPart("plain")
+            {
+                Text = $@"Hey {name},
 
             {body}
 
             -- {senderName}"
-        };
-        using var client = new SmtpClient();
-        await client.ConnectAsync(smtpServer, smtpPort, false);
+            };
+            using var client = new SmtpClient();
+            await client.ConnectAsync(smtpServer, smtpPort, false);
 
-        // Note: only needed if the SMTP server requires authentication
-        await client.AuthenticateAsync(senderEmail, password);
+            // Note: only needed if the SMTP server requires authentication
+            await client.AuthenticateAsync(senderEmail, password);
 
-        await client.SendAsync(message);
-        await client.DisconnectAsync(true);
+            await client.SendAsync(message);
+            await client.DisconnectAsync(true);
         }
         catch (SmtpProtocolException)
         {
