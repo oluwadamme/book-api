@@ -12,6 +12,7 @@ builder.Services.AddOpenApi();
 builder.Services.AddControllers();
 
 builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<EmailService>();
 
 builder.Services.AddAuthentication("Bearer").AddJwtBearer(options =>
 {
