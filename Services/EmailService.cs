@@ -31,7 +31,7 @@ public class EmailService(IConfiguration config, ILogger<EmailService> logger) :
             -- {senderName}"
             };
             using var client = new SmtpClient();
-            await client.ConnectAsync(smtpServer, smtpPort, false);
+            await client.ConnectAsync(smtpServer, smtpPort, MailKit.Security.SecureSocketOptions.StartTls);
 
             // Note: only needed if the SMTP server requires authentication
             await client.AuthenticateAsync(senderEmail, password);

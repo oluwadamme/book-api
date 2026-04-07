@@ -41,6 +41,13 @@ builder.Services.AddDbContext<FirstApiContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 var app = builder.Build();
+
+// Automatically apply database migrations on startup
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<FirstApiContext>();
+    db.Database.Migrate();
+}
 app.UseMiddleware<ExceptionMiddleware>();
 
 app.UseAuthentication();   // ← BEFORE authorization

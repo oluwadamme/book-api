@@ -207,13 +207,25 @@ dotnet ef database update
 
 ### 4. Run the Application
 
+You can run the application using either the .NET CLI natively, or via Docker for a complete containerized environment.
+
+#### Option A: Native (.NET)
 ```bash
 dotnet run
 ```
+The API will start on the URL configured in `Properties/launchSettings.json`.
 
-The API will start on the URL configured in `Properties/launchSettings.json`. In development mode, OpenAPI docs are available at:
+#### Option B: Docker Compose (Recommended)
+```bash
+docker-compose up --build
 ```
-https://localhost:<port>/openapi/v1.json
+Docker will automatically spin up a PostgreSQL instance, build the API container, apply any pending EF Core database migrations, and map the API to `http://localhost:5001`.
+
+---
+
+In development mode, OpenAPI docs are available at:
+```
+http://localhost:5001/openapi/v1.json
 ```
 
 ---
@@ -603,7 +615,7 @@ The database is pre-populated with the following books when migrations are appli
 - [x] Add **refresh tokens** for seamless token renewal
 - [x] Add a **Service/Repository layer** to separate concerns
 - [x] Write **unit and integration tests** with xUnit
-- [ ] Add **Docker support** with `docker-compose.yml`
+- [x] Add **Docker support** with `docker-compose.yml`
 - [x] Implement **global error handling middleware**
 - [ ] Add **API versioning**
 - [ ] Add **rate limiting** to prevent brute-force attacks
