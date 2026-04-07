@@ -76,7 +76,7 @@ public class AuthService : IAuthService
 
     }
 
-    public async Task<EmailVerificationStatus> ResendEmailVerificationTokenAsync(ForgetPasswordRequest request)
+    public async Task<bool> ResendEmailVerificationTokenAsync(ForgetPasswordRequest request)
     {
         var email = request.Email;
         var emailError = ValidateEmail(email);
@@ -87,11 +87,11 @@ public class AuthService : IAuthService
         var user = await _authRepository.GetUserByEmailAsync(email);
         if (user == null)
         {
-            return EmailVerificationStatus.UserNotFound;
+            throw new KeyNotFoundException("User not found");
         }
         if (user.IsEmailVerified)
         {
-            return EmailVerificationStatus.Verified;
+            throw new ArgumentException("User is already verified");
         }
         var emailVerificationToken = GenerateVerificationToken();
         var subject = "Verify your email";
@@ -101,7 +101,7 @@ public class AuthService : IAuthService
         user.EmailVerificationTokenExpiry = DateTime.UtcNow.AddMinutes(int.Parse(_config.GetSection("EmailVerification")["ExpirationInMinutes"]!));
         await _authRepository.UpdateUserAsync(user);
         _ = _emailService.SendEmailAsync(user.Email, user.FirstName, subject, body);
-        return EmailVerificationStatus.NotVerified;
+        return true;
     }
 
 
@@ -145,11 +145,11 @@ public class AuthService : IAuthService
         var user = await _authRepository.GetUserByEmailAsync(request.Email);
         if (user == null)
         {
-            return false;
+            throw new KeyNotFoundException("User not found");
         }
         if (user.PasswordResetToken != request.Token || user.PasswordResetTokenExpiry < DateTime.UtcNow)
         {
-            return false;
+            throw new UnauthorizedAccessException("Invalid token");
         }
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
         user.PasswordResetToken = null;
@@ -177,13 +177,13 @@ public class AuthService : IAuthService
 
         if (string.IsNullOrEmpty(request.Token))
         {
-            throw new ArgumentException("Token is required");
+            throw new UnauthorizedAccessException("Token is required");
         }
 
         var user = await _authRepository.GetUserByEmailAndTokenAsync(email!, token!);
         if (user == null || user.EmailVerificationTokenExpiry < DateTime.UtcNow)
         {
-            return false;
+            throw new UnauthorizedAccessException("Invalid token");
         }
         user.IsEmailVerified = true;
         user.EmailVerificationToken = null;
@@ -253,12 +253,9 @@ public class AuthService : IAuthService
         // valid request body
         if (ValidateEmail(request.Email) != null)
         {
-            throw new ArgumentException("Invalid credentials");
+            throw new UnauthorizedAccessException("Invalid credentials");
         }
-        if (ValidatePassword(request.Password) != null)
-        {
-            throw new ArgumentException("Invalid credentials");
-        }
+
 
         var user = await _authRepository.GetUserByEmailAsync(request.Email);
 
@@ -303,7 +300,7 @@ public class AuthService : IAuthService
         var oldRefreshToken = request.RefreshToken;
         if (oldRefreshToken == null)
         {
-            throw new ArgumentException("Refresh token is required");
+            throw new UnauthorizedAccessException("Refresh token is required");
         }
         var user = await _authRepository.GetUserByRefreshTokenAsync(oldRefreshToken);
         if (user == null || user.RefreshTokenExpiry < DateTime.UtcNow)
@@ -375,7 +372,7 @@ public class AuthService : IAuthService
         var oldRefreshToken = request.RefreshToken;
         if (oldRefreshToken == null)
         {
-            throw new ArgumentException("Refresh token is required");
+            throw new UnauthorizedAccessException("Refresh token is required");
         }
         var user = await _authRepository.GetUserByRefreshTokenAsync(oldRefreshToken);
         if (user != null)

@@ -6,6 +6,7 @@ using Microsoft.IdentityModel.Tokens;
 using FirstApi.Repositories;
 using FirstApi.Services.Interfaces;
 using FirstApi.Repositories.Interfaces;
+using FirstApi.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -40,6 +41,7 @@ builder.Services.AddDbContext<FirstApiContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 var app = builder.Build();
+app.UseMiddleware<ExceptionMiddleware>();
 
 app.UseAuthentication();   // ← BEFORE authorization
 app.UseAuthorization();    // ← AFTER authentication

@@ -5,9 +5,15 @@ namespace FirstApi.Services;
 
 public class BookService(IBookRepository bookRepository) : IBookService
 {
-    public async Task<Book?> GetBookByIdAsync(int id, int userId)
+    public async Task<Book> GetBookByIdAsync(int id, int userId)
     {
-        return await bookRepository.GetBookByIdAsync(id, userId);
+
+        var book = await bookRepository.GetBookByIdAsync(id, userId);
+        if (book == null)
+        {
+            throw new KeyNotFoundException("Book not found");
+        }
+        return book;
     }
 
     public async Task<List<Book>> GetAllBooksAsync(int userId)
@@ -35,7 +41,7 @@ public class BookService(IBookRepository bookRepository) : IBookService
         var existingBook = await bookRepository.GetBookByIdAsync(id, userId);
         if (existingBook == null)
         {
-            throw new ArgumentException("Book not found");
+            throw new KeyNotFoundException("Book not found");
         }
         existingBook.Title = book.Title;
         existingBook.Author = book.Author;
@@ -49,7 +55,7 @@ public class BookService(IBookRepository bookRepository) : IBookService
         var existingBook = await bookRepository.GetBookByIdAsync(id, userId);
         if (existingBook == null)
         {
-            throw new ArgumentException("Book not found");
+            throw new KeyNotFoundException("Book not found");
         }
         await bookRepository.DeleteBookAsync(existingBook);
     }

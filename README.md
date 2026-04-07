@@ -41,7 +41,8 @@ A RESTful Web API built with **ASP.NET Core (.NET 10)** that provides full CRUD 
 - **Service/Repository Pattern** — Clean layered architecture separating HTTP handling (controllers), business logic (services), and data access (repositories). All layers communicate through interfaces for testability and loose coupling.
 - **Input Validation** — Email and password validation with strong password requirements.
 - **Standardized Responses** — All endpoints return a consistent `BaseResponse<T>` wrapper with `success`, `message`, and `data` fields.
-- **Structured Logging** — `ILogger<T>` used across controllers and services for structured error and info logging.
+- **Global Error Handling** — Centralized middleware maps exceptions to HTTP status codes, removing repetitive try/catch blocks across controllers.
+- **Structured Logging** — `ILogger<T>` used centrally in error handling and services for structured error and info logging.
 - **Entity Framework Core** — Code-first approach with migrations for database schema management.
 - **PostgreSQL** — Configured to use PostgreSQL as the relational database.
 - **Seed Data** — Automatically populates the database with sample books on initial migration.
@@ -90,6 +91,8 @@ FirstApi/
 │   ├── ResetPasswordRequest.cs        # Reset password request body (email, token, password)
 │   ├── UserDto.cs                     # User data without sensitive fields
 │   └── VerifyEmailRequest.cs          # Email verification request body (email, token)
+├── Middleware/
+│   └── ExceptionMiddleware.cs         # Catch-all error handler translating exceptions to HTTP responses
 ├── Models/
 │   ├── Books.cs                       # Book entity (linked to User via UserId)
 │   └── User.cs                        # User entity with verification, reset & refresh token fields
@@ -601,7 +604,7 @@ The database is pre-populated with the following books when migrations are appli
 - [x] Add a **Service/Repository layer** to separate concerns
 - [x] Write **unit and integration tests** with xUnit
 - [ ] Add **Docker support** with `docker-compose.yml`
-- [ ] Implement **global error handling middleware**
+- [x] Implement **global error handling middleware**
 - [ ] Add **API versioning**
 - [ ] Add **rate limiting** to prevent brute-force attacks
 - [ ] Set up **CI/CD** with GitHub Actions
