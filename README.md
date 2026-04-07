@@ -32,6 +32,7 @@ A RESTful Web API built with **ASP.NET Core (.NET 10)** that provides full CRUD 
 ## Features
 
 - **JWT Authentication** — Secure register/login endpoints with BCrypt password hashing and JWT token generation.
+- **Refresh Tokens** — Long-lived refresh tokens with rotation for seamless token renewal without re-authentication.
 - **Email Verification** — OTP-based email verification on registration via SMTP (MailKit). Emails are sent fire-and-forget for fast responses.
 - **Password Reset** — Forgot password and reset password flow with time-limited OTP tokens.
 - **Protected Routes** — Books API requires a valid Bearer token to access.
@@ -75,22 +76,23 @@ A RESTful Web API built with **ASP.NET Core (.NET 10)** that provides full CRUD 
 ```
 FirstApi/
 ├── Controllers/
-│   ├── AuthController.cs              # Auth endpoints (register, login, verify, reset)
+│   ├── AuthController.cs              # Auth endpoints (register, login, verify, reset, refresh)
 │   └── BooksController.cs             # Books CRUD endpoints (protected, ownership-based)
 ├── Data/
 │   └── FirstApiContext.cs             # EF Core DbContext with seed data & User config
 ├── DTOs/
-│   ├── AuthResponse.cs                # Login response (token, user info, expiration)
+│   ├── AuthResponse.cs                # Login response (token, refresh token, user info, expiration)
 │   ├── BaseResponse.cs                # Generic API response wrapper
 │   ├── ForgetPasswordRequest.cs       # Forgot password request body
 │   ├── LoginRequest.cs                # Login request body
+│   ├── RefreshTokenRequest.cs         # Refresh token request body
 │   ├── RegisterRequest.cs             # Registration request body
 │   ├── ResetPasswordRequest.cs        # Reset password request body (email, token, password)
 │   ├── UserDto.cs                     # User data without sensitive fields
 │   └── VerifyEmailRequest.cs          # Email verification request body (email, token)
 ├── Models/
 │   ├── Books.cs                       # Book entity (linked to User via UserId)
-│   └── User.cs                        # User entity with verification & reset token fields
+│   └── User.cs                        # User entity with verification, reset & refresh token fields
 ├── Repositories/
 │   ├── Interfaces/
 │   │   ├── IAuthRepository.cs         # Auth data access contract
@@ -102,7 +104,7 @@ FirstApi/
 │   │   ├── IAuthService.cs            # Auth business logic contract
 │   │   ├── IBookService.cs            # Book business logic contract
 │   │   └── IEmailService.cs           # Email service contract
-│   ├── AuthService.cs                 # Auth logic (register, login, verify, reset, JWT)
+│   ├── AuthService.cs                 # Auth logic (register, login, verify, reset, refresh, JWT)
 │   ├── BookService.cs                 # Book logic (validation, ownership, orchestration)
 │   └── EmailService.cs                # SMTP email sending via MailKit (fire-and-forget)
 ├── FirstApi.Tests/
@@ -260,7 +262,8 @@ Base URL: `/api/Auth`
 | Method | Endpoint | Description | Auth Required |
 |---|---|---|---|
 | `POST` | `/api/Auth/register` | Register a new user (sends verification OTP) | ❌ No |
-| `POST` | `/api/Auth/login` | Login and receive a JWT token | ❌ No |
+| `POST` | `/api/Auth/login` | Login and receive JWT + refresh token | ❌ No |
+| `POST` | `/api/Auth/refresh-token` | Exchange refresh token for new JWT + refresh token | ❌ No |
 | `POST` | `/api/Auth/verify-email` | Verify email with OTP code | ❌ No |
 | `POST` | `/api/Auth/resend-email-verification-token` | Resend verification OTP | ❌ No |
 | `POST` | `/api/Auth/forgot-password` | Request a password reset OTP | ❌ No |
@@ -292,10 +295,13 @@ Base URL: `/api/Books`
    └── Submit OTP from email to verify account
 
 3. Login → POST /api/Auth/login
-   └── Returns JWT token + user info + expiration
+   └── Returns JWT token (15 min) + refresh token (30 days)
 
 4. Access protected routes → GET /api/Books
    └── Include header: Authorization: Bearer <your-token>
+
+5. Token expires → POST /api/Auth/refresh-token
+   └── Send refresh token → get new JWT + new refresh token (rotation)
 ```
 
 ### Password Reset Flow
@@ -385,6 +391,7 @@ Content-Type: application/json
   "message": "User logged in successfully",
   "data": {
     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refreshToken": "a8Kx9mN2pQ7...",
     "id": 1,
     "firstName": "John",
     "lastName": "Doe",
@@ -392,10 +399,43 @@ Content-Type: application/json
     "isEmailVerified": true,
     "createdAt": "2026-04-03T23:00:00Z",
     "updatedAt": "2026-04-03T23:00:00Z",
-    "tokenExpiration": "2026-04-04T00:00:00Z"
+    "tokenExpiration": "2026-04-03T23:15:00Z"
   }
 }
 ```
+
+### Refresh Token
+
+```http
+POST /api/Auth/refresh-token
+Content-Type: application/json
+
+{
+  "refreshToken": "a8Kx9mN2pQ7..."
+}
+```
+
+**Response** `200 OK`:
+```json
+{
+  "success": true,
+  "message": "Token refreshed successfully",
+  "data": {
+    "token": "eyJnZXdKb1...",
+    "refreshToken": "b7Zy3kP4...",
+    "id": 1,
+    "firstName": "John",
+    "lastName": "Doe",
+    "email": "john@example.com",
+    "isEmailVerified": true,
+    "createdAt": "2026-04-03T23:00:00Z",
+    "updatedAt": "2026-04-03T23:00:00Z",
+    "tokenExpiration": "2026-04-04T00:15:00Z"
+  }
+}
+```
+
+> **Note:** Refresh token rotation — each refresh invalidates the previous refresh token and issues a new one.
 
 ### Forgot Password
 
@@ -542,7 +582,8 @@ The database is pre-populated with the following books when migrations are appli
 | JWT Secret Key | `appsettings.json` → `Jwt.Key` | Key used to sign JWT tokens (min 32 chars) |
 | JWT Issuer | `appsettings.json` → `Jwt.Issuer` | Token issuer for validation |
 | JWT Audience | `appsettings.json` → `Jwt.Audience` | Token audience for validation |
-| Token Expiry | `appsettings.json` → `Jwt.ExpirationInMinutes` | Token lifetime in minutes |
+| Token Expiry | `appsettings.json` → `Jwt.ExpirationInMinutes` | Access token lifetime in minutes (default: 15) |
+| Refresh Token Expiry | `appsettings.json` → `Jwt.RefreshTokenExpirationInDays` | Refresh token lifetime in days (default: 30) |
 | SMTP Server | `appsettings.json` → `EmailSettings.SmtpServer` | Email server (e.g., `smtp.gmail.com`) |
 | SMTP Port | `appsettings.json` → `EmailSettings.SmtpPort` | SMTP port (587 for TLS) |
 | Sender Email | `appsettings.json` → `EmailSettings.SenderEmail` | Email address to send from |
@@ -556,7 +597,7 @@ The database is pre-populated with the following books when migrations are appli
 
 - [x] Add **email verification** on registration
 - [x] Implement **password reset** flow
-- [ ] Add **refresh tokens** for seamless token renewal
+- [x] Add **refresh tokens** for seamless token renewal
 - [x] Add a **Service/Repository layer** to separate concerns
 - [x] Write **unit and integration tests** with xUnit
 - [ ] Add **Docker support** with `docker-compose.yml`

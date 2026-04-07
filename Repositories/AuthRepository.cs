@@ -32,4 +32,9 @@ public class AuthRepository(FirstApiContext context) : IAuthRepository
     {
         return await context.Users.FirstOrDefaultAsync(u => u.Email == email && u.EmailVerificationToken == token);
     }
+
+    public async Task<User?> GetUserByRefreshTokenAsync(string refreshToken)
+    {
+        return await context.Users.FirstOrDefaultAsync(u => u.RefreshToken == refreshToken);
+    }
 }

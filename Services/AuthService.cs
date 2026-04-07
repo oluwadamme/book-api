@@ -273,11 +273,20 @@ public class AuthService : IAuthService
         // }
 
         var token = GenerateJwtToken(user);
+        var refreshToken = GenerateRefreshToken();
+        var refreshTokenExpiry = DateTime.UtcNow.AddDays(int.Parse(_config.GetSection("Jwt")["RefreshTokenExpirationInDays"]!));
+        user.RefreshToken = refreshToken;
+        user.RefreshTokenExpiry = refreshTokenExpiry;
+        await _authRepository.UpdateUserAsync(user);
+
+
+
 
         return new AuthResponse
         {
             Token = token,
             Id = user.Id,
+            RefreshToken = refreshToken,
             FirstName = user.FirstName,
             LastName = user.LastName,
             Email = user.Email,
@@ -287,6 +296,39 @@ public class AuthService : IAuthService
             IsEmailVerified = user.IsEmailVerified
         };
 
+    }
+
+    public async Task<AuthResponse> RefreshTokenAsync(RefreshTokenRequest request)
+    {
+        var oldRefreshToken = request.RefreshToken;
+        if (oldRefreshToken == null)
+        {
+            throw new ArgumentException("Refresh token is required");
+        }
+        var user = await _authRepository.GetUserByRefreshTokenAsync(oldRefreshToken);
+        if (user == null || user.RefreshTokenExpiry < DateTime.UtcNow)
+        {
+            throw new UnauthorizedAccessException("Invalid refresh token");
+        }
+        var token = GenerateJwtToken(user);
+        var newRefreshToken = GenerateRefreshToken();
+        var refreshTokenExpiry = DateTime.UtcNow.AddDays(int.Parse(_config.GetSection("Jwt")["RefreshTokenExpirationInDays"]!));
+        user.RefreshToken = newRefreshToken;
+        user.RefreshTokenExpiry = refreshTokenExpiry;
+        await _authRepository.UpdateUserAsync(user);
+        return new AuthResponse
+        {
+            Token = token,
+            Id = user.Id,
+            RefreshToken = newRefreshToken,
+            FirstName = user.FirstName,
+            LastName = user.LastName,
+            Email = user.Email,
+            CreatedAt = user.CreatedAt,
+            UpdatedAt = user.UpdatedAt,
+            TokenExpiration = DateTime.UtcNow.AddMinutes(int.Parse(_config.GetSection("Jwt")["ExpirationInMinutes"]!)),
+            IsEmailVerified = user.IsEmailVerified
+        };
     }
 
     private string GenerateJwtToken(User user)
@@ -319,4 +361,31 @@ public class AuthService : IAuthService
         var token = tokenHandler.CreateToken(tokenDescriptor);
         return tokenHandler.WriteToken(token);
     }
+
+    private string GenerateRefreshToken()
+    {
+        var randomBytes = new byte[64];
+        using var rng = RandomNumberGenerator.Create();
+        rng.GetBytes(randomBytes);
+        return Convert.ToBase64String(randomBytes);
+    }
+
+    public async Task<bool> RevokeRefreshTokenAsync(RefreshTokenRequest request)
+    {
+        var oldRefreshToken = request.RefreshToken;
+        if (oldRefreshToken == null)
+        {
+            throw new ArgumentException("Refresh token is required");
+        }
+        var user = await _authRepository.GetUserByRefreshTokenAsync(oldRefreshToken);
+        if (user != null)
+        {
+            user.RefreshToken = null;
+            user.RefreshTokenExpiry = null;
+            await _authRepository.UpdateUserAsync(user);
+            return true;
+        }
+        return false;
+    }
+
 }

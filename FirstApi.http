@@ -1,16 +1,15 @@
 @FirstApi_HostAddress = http://localhost:5246
 @email = adeniyidamilola246@gmail.com
-@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkJlYXJlciJ9.eyJuYW1laWQiOiIxIiwiZW1haWwiOiJqb2huQGV4YW1wbGUuY29tIiwiZ2l2ZW5fbmFtZSI6IkpvaG4iLCJmYW1pbHlfbmFtZSI6IkRvZSIsIm5iZiI6MTc3NTUxOTE1MiwiZXhwIjoxNzc1NTIyNzUyLCJpYXQiOjE3NzU1MTkxNTIsImlzcyI6Imh0dHBzOi8vbG9jYWxob3N0OjcwMDAiLCJhdWQiOiJodHRwczovL2xvY2FsaG9zdDo3MDAwIn0.MBEH09m8RLXbkZBuybZ8wRJLDMp9cgr8wMhQDVIqVr0
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkJlYXJlciJ9.eyJuYW1laWQiOiIxIiwiZW1haWwiOiJqb2huQGV4YW1wbGUuY29tIiwiZ2l2ZW5fbmFtZSI6IkpvaG4iLCJmYW1pbHlfbmFtZSI6IkRvZSIsIm5iZiI6MTc3NTU2MDI1NSwiZXhwIjoxNzc1NTYzODU1LCJpYXQiOjE3NzU1NjAyNTUsImlzcyI6Imh0dHBzOi8vbG9jYWxob3N0OjcwMDAiLCJhdWQiOiJodHRwczovL2xvY2FsaG9zdDo3MDAwIn0.Io6R83RZ9ECHFehdTe-xH43IJoeEd__6a4XvbwTXDZA
+@refreshToken = sPOd3HjXUM0uo92LCliCoOhBWPqb5qiTcboqLNS4Ch7wXnaOzs4nqDqceZt1dAvMqEy+b6+lUH3AxD+lWpJoGA==
 GET {{FirstApi_HostAddress}}/weatherforecast/
 Accept: application/json
 
 ###
-
 GET {{FirstApi_HostAddress}}/
 Accept: application/json
 
 ###
-
 GET {{FirstApi_HostAddress}}/api/books
 Accept: application/json
 Authorization: Bearer {{token}}
@@ -66,6 +65,14 @@ Content-Type: application/json
 {
   "email": "john@example.com",
   "password": "Password123!"
+}
+
+###
+POST {{FirstApi_HostAddress}}/api/auth/refresh-token
+Content-Type: application/json
+
+{
+    "refreshToken": "{{refreshToken}}"
 }
 
 ###

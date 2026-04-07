@@ -9,6 +9,8 @@ public interface IAuthService
     Task<EmailVerificationStatus> ResendEmailVerificationTokenAsync(ForgetPasswordRequest request);
     Task<bool> ForgotPasswordAsync(ForgetPasswordRequest request);
     Task<bool> ResetPasswordAsync(ResetPasswordRequest request);
+    Task<AuthResponse> RefreshTokenAsync(RefreshTokenRequest request);
+    Task<bool> RevokeRefreshTokenAsync(RefreshTokenRequest request);
 }
 public enum EmailVerificationStatus
 {

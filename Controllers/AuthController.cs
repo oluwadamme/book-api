@@ -137,4 +137,27 @@ public class AuthController(IAuthService authService, ILogger<AuthController> lo
             return StatusCode(500, BaseResponse<bool>.ErrorResponse("An error occurred while resetting the password"));
         }
     }
+
+    [HttpPost("refresh-token")]
+    public async Task<ActionResult<BaseResponse<AuthResponse>>> RefreshToken(RefreshTokenRequest request)
+    {
+        try
+        {
+            var response = await authService.RefreshTokenAsync(request);
+            return Ok(BaseResponse<AuthResponse>.SuccessResponse("Token refreshed successfully", response));
+        }
+        catch (ArgumentException e)
+        {
+            return BadRequest(BaseResponse<AuthResponse>.ErrorResponse(e.Message));
+        }
+        catch (UnauthorizedAccessException e)
+        {
+            return Unauthorized(BaseResponse<AuthResponse>.ErrorResponse(e.Message));
+        }
+        catch (Exception e)
+        {
+            logger.LogError(e, "An error occurred while refreshing the token");
+            return StatusCode(500, BaseResponse<AuthResponse>.ErrorResponse("An error occurred while refreshing the token"));
+        }
+    }
 }
