@@ -15,6 +15,7 @@ A RESTful Web API built with **ASP.NET Core (.NET 10)** that provides full CRUD 
   - [2. Configure the Database & JWT](#2-configure-the-database--jwt)
   - [3. Apply Migrations](#3-apply-migrations)
   - [4. Run the Application](#4-run-the-application)
+- [Testing](#testing)
 - [API Endpoints](#api-endpoints)
   - [Authentication API](#authentication-api)
   - [Books API (Protected)](#books-api-protected)
@@ -36,6 +37,7 @@ A RESTful Web API built with **ASP.NET Core (.NET 10)** that provides full CRUD 
 - **Protected Routes** — Books API requires a valid Bearer token to access.
 - **Ownership-Based Access** — Users can only view, edit, and delete books they created.
 - **Full CRUD API** — Create, Read, Update, and Delete book records.
+- **Service/Repository Pattern** — Clean layered architecture separating HTTP handling (controllers), business logic (services), and data access (repositories). All layers communicate through interfaces for testability and loose coupling.
 - **Input Validation** — Email and password validation with strong password requirements.
 - **Standardized Responses** — All endpoints return a consistent `BaseResponse<T>` wrapper with `success`, `message`, and `data` fields.
 - **Structured Logging** — `ILogger<T>` used across controllers and services for structured error and info logging.
@@ -44,6 +46,7 @@ A RESTful Web API built with **ASP.NET Core (.NET 10)** that provides full CRUD 
 - **Seed Data** — Automatically populates the database with sample books on initial migration.
 - **OpenAPI / Swagger** — Auto-generated API documentation available in development mode.
 - **Async Operations** — All database operations are fully asynchronous.
+- **Automated Testing** — Unit tests (xUnit + Moq) for service-layer business logic and integration tests using `WebApplicationFactory` with an in-memory database.
 
 ---
 
@@ -60,6 +63,10 @@ A RESTful Web API built with **ASP.NET Core (.NET 10)** that provides full CRUD 
 | MailKit | 4.15.1 | Email sending (SMTP) |
 | JWT Bearer Authentication | 10.0.5 | Token-based authentication |
 | OpenAPI | 10.0.3 | API documentation |
+| xUnit | 2.9.3 | Testing framework |
+| Moq | 4.20.72 | Mocking library for unit tests |
+| Microsoft.AspNetCore.Mvc.Testing | 10.0.5 | Integration test host |
+| EF Core InMemory | 10.0.5 | In-memory database for testing |
 
 ---
 
@@ -68,35 +75,64 @@ A RESTful Web API built with **ASP.NET Core (.NET 10)** that provides full CRUD 
 ```
 FirstApi/
 ├── Controllers/
-│   ├── AuthController.cs        # Auth endpoints (register, login, verify, reset)
-│   └── BooksController.cs       # Books CRUD endpoints (protected, ownership-based)
+│   ├── AuthController.cs              # Auth endpoints (register, login, verify, reset)
+│   └── BooksController.cs             # Books CRUD endpoints (protected, ownership-based)
 ├── Data/
-│   └── FirstApiContext.cs       # EF Core DbContext with seed data & User config
+│   └── FirstApiContext.cs             # EF Core DbContext with seed data & User config
 ├── DTOs/
-│   ├── AuthResponse.cs          # Login response (token, user info, expiration)
-│   ├── BaseResponse.cs          # Generic API response wrapper
-│   ├── ForgetPasswordRequest.cs # Forgot password request body
-│   ├── LoginRequest.cs          # Login request body
-│   ├── RegisterRequest.cs       # Registration request body
-│   ├── ResetPasswordRequest.cs  # Reset password request body (email, token, password)
-│   ├── UserDto.cs               # User data without sensitive fields
-│   └── VerifyEmailRequest.cs    # Email verification request body (email, token)
+│   ├── AuthResponse.cs                # Login response (token, user info, expiration)
+│   ├── BaseResponse.cs                # Generic API response wrapper
+│   ├── ForgetPasswordRequest.cs       # Forgot password request body
+│   ├── LoginRequest.cs                # Login request body
+│   ├── RegisterRequest.cs             # Registration request body
+│   ├── ResetPasswordRequest.cs        # Reset password request body (email, token, password)
+│   ├── UserDto.cs                     # User data without sensitive fields
+│   └── VerifyEmailRequest.cs          # Email verification request body (email, token)
 ├── Models/
-│   ├── Books.cs                 # Book entity (linked to User via UserId)
-│   └── User.cs                  # User entity with verification & reset token fields
+│   ├── Books.cs                       # Book entity (linked to User via UserId)
+│   └── User.cs                        # User entity with verification & reset token fields
+├── Repositories/
+│   ├── Interfaces/
+│   │   ├── IAuthRepository.cs         # Auth data access contract
+│   │   └── IBookRepository.cs         # Book data access contract
+│   ├── AuthRepository.cs              # Auth data access (EF Core queries for Users)
+│   └── BookRepository.cs              # Book data access (EF Core queries for Books)
 ├── Services/
-│   ├── AuthService.cs           # Auth logic (register, login, verify, reset, JWT)
-│   └── EmailService.cs          # SMTP email sending via MailKit (fire-and-forget)
+│   ├── Interfaces/
+│   │   ├── IAuthService.cs            # Auth business logic contract
+│   │   ├── IBookService.cs            # Book business logic contract
+│   │   └── IEmailService.cs           # Email service contract
+│   ├── AuthService.cs                 # Auth logic (register, login, verify, reset, JWT)
+│   ├── BookService.cs                 # Book logic (validation, ownership, orchestration)
+│   └── EmailService.cs                # SMTP email sending via MailKit (fire-and-forget)
+├── FirstApi.Tests/
+│   ├── UnitTests/
+│   │   ├── Services/
+│   │   │   └── AuthServiceTests.cs    # Unit tests for AuthService (Moq-based)
+│   │   └── Repositories/
+│   │       └── BookRepositoryTests.cs # Unit tests for BookRepository (InMemory DB)
+│   ├── IntegrationTests/
+│   │   ├── CustomWebApplicationFactory.cs  # Test server factory (InMemory DB + config)
+│   │   └── AuthControllerTests.cs     # Integration tests for Auth endpoints
+│   └── FirstApi.Tests.csproj          # Test project file
 ├── Properties/
-│   └── launchSettings.json      # Launch/debug profiles
-├── appsettings.json             # App configuration (DB, JWT, SMTP settings)
-├── appsettings.Development.json # Development-specific overrides
-├── Program.cs                   # App entry point, middleware & DI configuration
-├── FirstApi.csproj              # Project file with NuGet dependencies
-├── FirstApi.sln                 # Solution file
-├── FirstApi.http                # HTTP request samples for testing
+│   └── launchSettings.json            # Launch/debug profiles
+├── appsettings.json                   # App configuration (DB, JWT, SMTP settings)
+├── appsettings.Development.json       # Development-specific overrides
+├── Program.cs                         # App entry point, middleware & DI configuration
+├── FirstApi.csproj                    # Project file with NuGet dependencies
+├── FirstApi.sln                       # Solution file
+├── FirstApi.http                      # HTTP request samples for testing
 └── README.md
 ```
+
+### Architecture
+
+```
+Controller (HTTP) → Service (Business Logic) → Repository (Data Access) → Database
+```
+
+Each layer communicates through interfaces, enabling loose coupling and testability.
 
 ---
 
@@ -174,6 +210,44 @@ The API will start on the URL configured in `Properties/launchSettings.json`. In
 ```
 https://localhost:<port>/openapi/v1.json
 ```
+
+---
+
+## Testing
+
+The project includes both **unit tests** and **integration tests** using xUnit.
+
+### Test Structure
+
+| Type | Location | Description |
+|---|---|---|
+| **Unit Tests** | `FirstApi.Tests/UnitTests/Services/` | Test service-layer business logic with Moq-mocked dependencies |
+| **Unit Tests** | `FirstApi.Tests/UnitTests/Repositories/` | Test repository-layer data access with EF Core InMemory database |
+| **Integration Tests** | `FirstApi.Tests/IntegrationTests/` | Test full HTTP request pipeline using `WebApplicationFactory` |
+
+### Running Tests
+
+```bash
+# Run all tests
+dotnet test
+
+# Run with detailed output
+dotnet test --verbosity normal
+
+# Run only unit tests
+dotnet test --filter "UnitTests"
+
+# Run only integration tests
+dotnet test --filter "IntegrationTests"
+```
+
+### Integration Test Setup
+
+Integration tests use a `CustomWebApplicationFactory` that:
+- Replaces the PostgreSQL database with an **EF Core InMemory** database
+- Provides test JWT and email verification configuration
+- Uses a unique database name per test run to prevent cross-contamination
+- Sets the environment to `Testing`
 
 ---
 
@@ -483,8 +557,8 @@ The database is pre-populated with the following books when migrations are appli
 - [x] Add **email verification** on registration
 - [x] Implement **password reset** flow
 - [ ] Add **refresh tokens** for seamless token renewal
-- [ ] Add a **Service/Repository layer** to separate concerns
-- [ ] Write **unit and integration tests** with xUnit
+- [x] Add a **Service/Repository layer** to separate concerns
+- [x] Write **unit and integration tests** with xUnit
 - [ ] Add **Docker support** with `docker-compose.yml`
 - [ ] Implement **global error handling middleware**
 - [ ] Add **API versioning**

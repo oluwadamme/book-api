@@ -56,3 +56,6 @@ app.UseHttpsRedirection();
 app.MapControllers();
 
 app.Run();
+
+// Make Program accessible for integration tests (WebApplicationFactory<Program>)
+public partial class Program { }
