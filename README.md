@@ -31,6 +31,7 @@ A RESTful Web API built with **ASP.NET Core (.NET 10)** that provides full CRUD 
 
 ## Features
 
+- **Rate Limiting** — Fixed window rate limiter configured to protect Authentication endpoints from brute-force attacks.
 - **JWT Authentication** — Secure register/login endpoints with BCrypt password hashing and JWT token generation.
 - **Refresh Tokens** — Long-lived refresh tokens with rotation for seamless token renewal without re-authentication.
 - **Email Verification** — OTP-based email verification on registration via SMTP (MailKit). Emails are sent fire-and-forget for fast responses.
@@ -618,7 +619,7 @@ The database is pre-populated with the following books when migrations are appli
 - [x] Add **Docker support** with `docker-compose.yml`
 - [x] Implement **global error handling middleware**
 - [ ] Add **API versioning**
-- [ ] Add **rate limiting** to prevent brute-force attacks
+- [x] Add **rate limiting** to prevent brute-force attacks
 - [ ] Set up **CI/CD** with GitHub Actions
 
 ---

@@ -53,9 +53,9 @@ POST {{FirstApi_HostAddress}}/api/auth/register
 Content-Type: application/json
 
 {
-  "firstName": "Dee",
-  "lastName": "Doe",
-  "email":"dee1@mailinator.com",
+  "firstName": "Deeman",
+  "lastName": "Doeman",
+  "email":"dee3@mailinator.com",
   "password": "Test123!"
 }
 
@@ -109,6 +109,6 @@ POST {{FirstApi_HostAddress}}/api/auth/verify-email
 Content-Type: application/json
 
 {
-    "email": "adeniyidamilola38@gmail.com",
-    "token": "7598"
+    "email": "dee3@mailinator.com",
+    "token": "9639"
 }
