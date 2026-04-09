@@ -26,5 +26,5 @@ jobs:
         Jwt__Issuer: ${{ secrets.JWT_ISSUER }}
         Jwt__Audience: ${{ secrets.JWT_AUDIENCE }}
         EmailSettings__Password: ${{ secrets.SMTP_PASSWORD }}
-      run: dotnet test --no-build --verbosity normal
+      run: dotnet test --no-build --configuration Release --verbosity normal
   
