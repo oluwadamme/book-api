@@ -21,6 +21,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                 ["Jwt:Issuer"] = "TestIssuer",
                 ["Jwt:Audience"] = "TestAudience",
                 ["Jwt:ExpirationInMinutes"] = "60",
+                ["Jwt:RefreshTokenExpirationInDays"] = "30",
                 ["EmailVerification:ExpirationInMinutes"] = "30",
                 // Override the connection string to prevent Npgsql from being used
                 ["ConnectionStrings:DefaultConnection"] = ""

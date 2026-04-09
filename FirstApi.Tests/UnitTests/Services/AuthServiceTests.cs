@@ -114,6 +114,7 @@ public class AuthServiceTests
         var mockJwtSection = new Mock<IConfigurationSection>();
         mockJwtSection.Setup(s => s["Key"]).Returns("ThisIsASecretKeyForTestingPurposes123!");
         mockJwtSection.Setup(s => s["ExpirationInMinutes"]).Returns("60");
+        mockJwtSection.Setup(s => s["RefreshTokenExpirationInDays"]).Returns("30");
         mockJwtSection.Setup(s => s["Issuer"]).Returns("TestIssuer");
         mockJwtSection.Setup(s => s["Audience"]).Returns("TestAudience");
         _mockConfiguration.Setup(c => c.GetSection("Jwt")).Returns(mockJwtSection.Object);

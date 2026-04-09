@@ -88,7 +88,7 @@ public class BookRepositoryTests
         // Act — asking for userId=999, but book belongs to userId=5
         var result = await repository.GetBookByIdAsync(1, 999);
 
-        // Assert
+        // Assert — repository returns null, it does not throw
         Assert.Null(result);
     }
 

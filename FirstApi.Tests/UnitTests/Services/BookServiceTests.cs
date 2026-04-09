@@ -80,16 +80,16 @@ public class BookServiceTests
         Assert.Equal("Found", result.Title);
     }
     [Fact]
-    public async Task GetBookByIdAsync_NonExistentBook_ReturnsNull()
+    public async Task GetBookByIdAsync_NonExistentBook_ThrowsKeyNotFoundException()
     {
         // Arrange — mock returns null (book not found)
         _mockBookRepository
             .Setup(repo => repo.GetBookByIdAsync(999, 5))
             .ReturnsAsync((Book?)null);
-        // Act
-        var result = await _bookService.GetBookByIdAsync(999, 5);
-        // Assert
-        Assert.Null(result);
+        // Act & Assert — service throws when repository returns null
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => _bookService.GetBookByIdAsync(999, 5)
+        );
     }
     [Fact]
     public async Task DeleteBookAsync_BookNotFound_ThrowsArgumentException()
@@ -99,7 +99,7 @@ public class BookServiceTests
             .Setup(repo => repo.GetBookByIdAsync(999, 1))
             .ReturnsAsync((Book?)null);
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<ArgumentException>(
+        var exception = await Assert.ThrowsAsync<KeyNotFoundException>(
             () => _bookService.DeleteBookAsync(999, 1)
         );
         Assert.Equal("Book not found", exception.Message);
