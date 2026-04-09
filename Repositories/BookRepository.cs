@@ -14,7 +14,7 @@ public class BookRepository(FirstApiContext context) : IBookRepository
 
     public async Task<List<Book>> GetAllBooksAsync(int userId)
     {
-        return await context.Books.Where(b => b.UserId == userId).ToListAsync();
+        return await context.Books.AsNoTracking().Where(b => b.UserId == userId).OrderByDescending(b => b.Id).ToListAsync();
     }
 
     public async Task<Book> AddBookAsync(Book book)

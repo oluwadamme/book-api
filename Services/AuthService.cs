@@ -9,7 +9,7 @@ using FirstApi.Options;
 using Microsoft.Extensions.Options;
 using FirstApi.Services.Interfaces;
 using FirstApi.Repositories.Interfaces;
-
+using Hangfire;
 namespace FirstApi.Services;
 
 public class AuthService(IAuthRepository authRepository, IEmailService emailService, ILogger<AuthService> logger, IOptions<EmailVerificationOptions> emailOptions, IOptions<JwtOptions> jwtOptions) : IAuthService
@@ -47,10 +47,8 @@ public class AuthService(IAuthRepository authRepository, IEmailService emailServ
         };
 
         await authRepository.AddUserAsync(user);
-        _ = emailService.SendEmailAsync(request.Email, request.FirstName, subject, body).ContinueWith(
-            task => logger.LogError(task.Exception, "Failed to send email to {email}", user.Email),
-            TaskContinuationOptions.OnlyOnFaulted
-        );
+        BackgroundJob.Enqueue<IEmailService>(x =>
+        x.SendEmailAsync(user.Email, user.FirstName, subject, body));
 
         return new UserDto
         {
@@ -84,10 +82,8 @@ public class AuthService(IAuthRepository authRepository, IEmailService emailServ
         user.EmailVerificationToken = emailVerificationToken;
         user.EmailVerificationTokenExpiry = DateTime.UtcNow.AddMinutes(emailOptions.Value.ExpirationInMinutes);
         await authRepository.UpdateUserAsync(user);
-        _ = emailService.SendEmailAsync(user.Email, user.FirstName, subject, body).ContinueWith(
-             task => logger.LogError(task.Exception, "Failed to send email to {email}", user.Email),
-            TaskContinuationOptions.OnlyOnFaulted
-            );
+        BackgroundJob.Enqueue<IEmailService>(x =>
+        x.SendEmailAsync(user.Email, user.FirstName, subject, body));
         return true;
     }
 
@@ -108,10 +104,8 @@ public class AuthService(IAuthRepository authRepository, IEmailService emailServ
         user.PasswordResetToken = passwordResetToken;
         user.PasswordResetTokenExpiry = DateTime.UtcNow.AddMinutes(expirationInMinutes);
         await authRepository.UpdateUserAsync(user);
-        _ = emailService.SendEmailAsync(user.Email, user.FirstName, subject, body).ContinueWith(
-            task => logger.LogError(task.Exception, "Failed to send {email}", user.Email),
-            TaskContinuationOptions.OnlyOnFaulted
-            );
+        BackgroundJob.Enqueue<IEmailService>(x =>
+        x.SendEmailAsync(user.Email, user.FirstName, subject, body));
         return true;
     }
 

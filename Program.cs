@@ -12,6 +12,8 @@ using System.Threading.RateLimiting;
 using FirstApi.Options;
 using FluentValidation;
 using FluentValidation.AspNetCore;
+using Hangfire;
+using Hangfire.PostgreSql;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -70,8 +72,18 @@ builder.Services.AddRateLimiter(options =>
         config.QueueLimit = 0;
     });
 });
-var app = builder.Build();
 
+// 1. Tell Hangfire to use your existing PostgreSQL database
+builder.Services.AddHangfire(configuration => configuration
+    .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+    .UseSimpleAssemblyNameTypeSerializer()
+    .UseRecommendedSerializerSettings()
+    .UsePostgreSqlStorage(options => options.UseNpgsqlConnection(builder.Configuration.GetConnectionString("DefaultConnection"))));
+// 2. Add the Hangfire Server (the background worker that processes jobs)
+builder.Services.AddHangfireServer();
+
+var app = builder.Build();
+app.UseHangfireDashboard();
 // Automatically apply database migrations on startup
 using (var scope = app.Services.CreateScope())
 {

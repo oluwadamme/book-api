@@ -653,11 +653,11 @@ Passwords must meet all of the following criteria:
 - [ ] Add **API versioning** (to be done later)
 - [ ] Refactor to **Clean Architecture** — introduce a proper Domain layer and separate Application, Infrastructure concerns; decouple business logic from data access (to be done later)
 - [ ] Add **CQRS with MediatR** — separate read (queries) from write (commands) operations for cleaner, testable handlers (to be done later)
-- [ ] Replace manual validation with **FluentValidation** — cleaner, reusable validation rules that integrate with the DI container
-- [ ] Add **caching** — implement IMemoryCache on frequently read endpoints (e.g. GET /api/Books) and Redis for multi-instance support
-- [ ] Add **Hangfire** for proper background job processing — move fire-and-forget email sending to a persistent, retriable job queue
-- [ ] Add **ownership-based filtering at the repository level** — move the userId filter into BookRepository instead of BookService for cleaner separation
-- [ ] Implement **Problem Details (RFC 7807)** — standardize error responses to the RFC format instead of the custom BaseResponse wrapper for errors
+- [x] Replace manual validation with **FluentValidation** — cleaner, reusable validation rules that integrate with the DI container
+- [ ] Add **caching** — implement IMemoryCache on frequently read endpoints (e.g. GET /api/Books) and Redis for multi-instance support (to be done later)
+- [x] Add **Hangfire** for proper background job processing — move fire-and-forget email sending to a persistent, retriable job queue
+- [x] Add **ownership-based filtering at the repository level** — move the userId filter into BookRepository instead of BookService for cleaner separation
+- [x] Implement **Problem Details (RFC 7807)** — standardize error responses to the RFC format instead of the custom BaseResponse wrapper for errors
 - [ ] Add **explicit LINQ queries** in repositories — replace implicit EF Core queries with explicit Where/Select/OrderBy chains for better readability and control
 - [ ] Add **refresh token family tracking** — detect refresh token reuse attacks by invalidating an entire token family on suspicious reuse
 - [ ] Add **structured logging with Serilog** — replace ILogger with Serilog for structured, queryable logs with sinks (file, Seq, Application Insights)
