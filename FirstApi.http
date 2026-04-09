@@ -1,43 +1,114 @@
-@FirstApi_HostAddress = http://localhost:5246
-
+-- Active: 1775127578875@@127.0.0.1@5432
+@FirstApi_HostAddress = http://localhost:5001
+@email = adeniyidamilola246@gmail.com
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkJlYXJlciJ9.eyJuYW1laWQiOiIxIiwiZW1haWwiOiJhZGVuaXlpZGFtaWxvbGEzOEBnbWFpbC5jb20iLCJnaXZlbl9uYW1lIjoiSmFtZXMiLCJmYW1pbHlfbmFtZSI6IkRvZXMiLCJuYmYiOjE3NzU1NzMzODEsImV4cCI6MTc3NTU3NDI4MSwiaWF0IjoxNzc1NTczMzgxLCJpc3MiOiJodHRwczovL2xvY2FsaG9zdDo3MDAwIiwiYXVkIjoiaHR0cHM6Ly9sb2NhbGhvc3Q6NzAwMCJ9.i4Pdm3lSGQsFGYU4EuLylnFzk-moorZndgLLs56VhvU
+@refreshToken = z8o8DqqMebuH0catoe0n7gVSY0FPDlIDZdfQYmufco9i/LkNCIVYpO9jxo7sERYWge4RE8+K2M7qvwDkApC2og==
 GET {{FirstApi_HostAddress}}/weatherforecast/
 Accept: application/json
 
 ###
-
 GET {{FirstApi_HostAddress}}/
 Accept: application/json
 
 ###
-
 GET {{FirstApi_HostAddress}}/api/books
 Accept: application/json
+Authorization: Bearer {{token}}
 
 ###
 
-GET {{FirstApi_HostAddress}}/api/books/1
+GET {{FirstApi_HostAddress}}/api/books/7
 Accept: application/json
+Authorization: Bearer {{token}}
 
 ###
 POST {{FirstApi_HostAddress}}/api/books
 Content-Type: application/json
+Authorization: Bearer {{token}}
 
 {
-    "title": "Book 16",
-    "author": "Author 13",
-    "yearPublished": 2032
+    "title": "Book 2",
+    "author": "Author 5",
+    "yearPublished": 2509
 }
 
 ###
-PUT {{FirstApi_HostAddress}}/api/books/1
+PUT {{FirstApi_HostAddress}}/api/books/7
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+    "title": "Book 3",
+    "author": "Author 13",
+    "yearPublished": 2002
+}
+
+###
+DELETE {{FirstApi_HostAddress}}/api/books/6
+Accept: application/json
+Authorization: Bearer {{token}}
+
+###
+POST {{FirstApi_HostAddress}}/api/auth/register
 Content-Type: application/json
 
 {
-    "title": "Book 13",
-    "author": "Author 13",
-    "yearPublished": 2032
+  "firstName": "Deeman",
+  "lastName": "Doeman",
+  "email":"dee3@mailinator.com",
+  "password": "Test123!"
 }
 
 ###
-DELETE {{FirstApi_HostAddress}}/api/books/2
-Accept: application/json
+POST {{FirstApi_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email":"adeniyidamilola38@gmail.com",
+  "password": "Test123!"
+}
+# "email": "john@example.com",
+#   "password": "Password123!",
+
+###
+POST {{FirstApi_HostAddress}}/api/auth/refresh-token
+Content-Type: application/json
+
+{
+    "refreshToken": "{{refreshToken}}"
+}
+
+###
+POST {{FirstApi_HostAddress}}/api/auth/forgot-password
+Content-Type: application/json
+
+{
+    "email": "[EMAIL_ADDRESS]"
+}
+
+###
+POST {{FirstApi_HostAddress}}/api/auth/resend-email-verification-token
+Content-Type: application/json
+
+{
+    "email": "adeniyidamilola38@gmail.com"
+}
+
+###
+POST {{FirstApi_HostAddress}}/api/auth/reset-password
+Content-Type: application/json
+
+{
+    "email": "[EMAIL_ADDRESS]",
+    "token": "",
+    "password": "Password123!"
+}
+
+###
+POST {{FirstApi_HostAddress}}/api/auth/verify-email
+Content-Type: application/json
+
+{
+    "email": "dee3@mailinator.com",
+    "token": "9639"
+}

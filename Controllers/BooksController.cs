@@ -1,109 +1,71 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using FirstApi.Models;
-using FirstApi.Data;
-using Microsoft.EntityFrameworkCore;
-
+using Microsoft.AspNetCore.Authorization;
+using FirstApi.DTOs;
+using FirstApi.Services.Interfaces;
 namespace FirstApi.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class BooksController : ControllerBase
+    [Authorize]
+    public class BooksController(IBookService bookService) : ControllerBase
     {
-        private readonly FirstApiContext _context;
-
-        public BooksController(FirstApiContext context)
+        // Helper method to get the logged-in user's ID from the JWT token
+        private int GetUserId()
         {
-            _context = context;
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (userIdClaim == null)
+            {
+                throw new UnauthorizedAccessException("User not found");
+            }
+            return int.Parse(userIdClaim);
         }
 
-
-        // static private List<Book> _books =
-        // [
-        //     new Book { Id = 1, Title = "Book 1", Author = "Author 1", YearPublished = 2022 },
-        //     new Book { Id = 2, Title = "Book 2", Author = "Author 2", YearPublished = 2023 },
-        //     new Book { Id = 3, Title = "Book 3", Author = "Author 3", YearPublished = 2024 },
-        //     new Book { Id = 4, Title = "Book 4", Author = "Author 4", YearPublished = 2025 },
-        //     new Book { Id = 5, Title = "Book 5", Author = "Author 5", YearPublished = 2026 },
-        //     new Book { Id = 6, Title = "Book 6", Author = "Author 6", YearPublished = 2027 },
-        //     new Book { Id = 7, Title = "Book 7", Author = "Author 7", YearPublished = 2028 },
-        //     new Book { Id = 8, Title = "Book 8", Author = "Author 8", YearPublished = 2029 },
-        //     new Book { Id = 9, Title = "Book 9", Author = "Author 9", YearPublished = 2030 },
-        //     new Book { Id = 10, Title = "Book 10", Author = "Author 10", YearPublished = 2031 }
-
-        // ];
-
         [HttpGet]
-        public async Task<ActionResult<List<Book>>> GetBooks()
+        public async Task<ActionResult<BaseResponse<List<Book>>>> GetBooks()
         {
-           var books = await _context.Books.ToListAsync();
-             
+            var userId = GetUserId();
+            var books = await bookService.GetAllBooksAsync(userId);
 
-            return Ok(books);
+            return Ok(BaseResponse<List<Book>>.SuccessResponse("Books fetched successfully", books));
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<Book>> GetBook(int id)
+        public async Task<ActionResult<BaseResponse<Book>>> GetBook(int id)
         {
-                var books = await _context.Books.ToListAsync();
-            var book = books.FirstOrDefault(b => b.Id == id);
-            if (book == null)
-            {
-                return NotFound();
-            }
+            var userId = GetUserId();
+            var book = await bookService.GetBookByIdAsync(id, userId);
 
-            return Ok(book);
+            return Ok(BaseResponse<Book>.SuccessResponse("Book fetched successfully", book));
+
         }
 
         [HttpPost]
-        public async Task<ActionResult<Book>> CreateBook(Book? newBook)
+        public async Task<ActionResult<BaseResponse<Book>>> CreateBook(Book newBook)
         {
-        var books = _context.Books;
-            if (newBook == null)
-            {
-                return BadRequest();
-            }
+            var userId = GetUserId();
+            var book = await bookService.AddBookAsync(newBook, userId);
+            return CreatedAtAction(nameof(GetBook), new { id = book.Id }, BaseResponse<Book>.SuccessResponse("Book created successfully", book));
 
-            if (books.Any(b => b.Id == newBook.Id))
-            {
-                return BadRequest("Book with this id already exists");
-            }
-
-            newBook.Id = books.Max(b => b.Id) + 1;
-            _context.Books.Add(newBook);
-            await _context.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetBook), new { id = newBook.Id }, newBook);
         }
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateBook(int id, Book? book)
-        {   
-            if (book == null)
-            {
-                return BadRequest();
-            }
-            var existingBook = await _context.Books.FirstOrDefaultAsync(b => b.Id == id);
-            if (existingBook == null)
-            {
-                return NotFound();
-            }
-            existingBook.Title = book.Title;
-            existingBook.Author = book.Author;
-            existingBook.YearPublished = book.YearPublished;
-            await _context.SaveChangesAsync();
-            return NoContent();
+        public async Task<ActionResult<BaseResponse<string>>> UpdateBook(int id, Book book)
+        {
+            var userId = GetUserId();
+            await bookService.UpdateBookAsync(id, book, userId);
+            return Ok(BaseResponse<string>.SuccessResponse("Book updated successfully", "Book updated successfully"));
+
         }
 
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteBook(int id)
+        public async Task<ActionResult<BaseResponse<string>>> DeleteBook(int id)
         {
-            var book = await _context.Books.FirstOrDefaultAsync(b => b.Id == id);
-            if (book == null)
-            {
-                return NotFound();
-            }
-            _context.Books.Remove(book);
-            await _context.SaveChangesAsync();
-            return NoContent();
+            var userId = GetUserId();
+            await bookService.DeleteBookAsync(id, userId);
+            return Ok(BaseResponse<string>.SuccessResponse("Book deleted successfully", "Book deleted successfully"));
+
         }
     }
 }

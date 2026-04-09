@@ -1,0 +1,33 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=firstapi
+    ports:
+      - "5432:5432"
+  
+  api:
+    build: .
+    ports:
+      - "5001:8080"
+    depends_on:
+      - postgres
+    environment:
+      - ConnectionStrings__DefaultConnection=Server=postgres;Port=5432;Database=firstapi;Username=postgres;Password=postgres;SSL Mode=Disable
+      - EmailSettings__SmtpServer=smtp.gmail.com
+      - EmailSettings__SmtpPort=587
+      - EmailSettings__SenderEmail=adeniyidamilola246@gmail.com
+      - EmailSettings__SenderName=BookApi
+      - EmailSettings__Password=foah objf fbca crlj
+      - Jwt__Issuer=https://localhost:7000
+      - Jwt__Audience=https://localhost:7000
+      - Jwt__Key=greatIstheefaithFullNessOfGod,EarlyTheMorning,yourmerciesIsee,allaroundme,ohLordyouaregood,andIwillliftmyvoice
+      - Jwt__ExpirationInMinutes=15
+      - Jwt__RefreshTokenExpirationInDays=30
+      - EmailVerification__ExpirationInMinutes=15
+      - EmailVerification__BaseUrl=https://localhost:7000
+      # - ASPNETCORE_ENVIRONMENT=Development
+      - DOTNET_SYSTEM_NET_DISABLEIPV6=1

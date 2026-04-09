@@ -1,0 +1,30 @@
+name: BookApi CI
+
+on:
+  push:
+    branches: [  develop ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 10.0.x
+    - name: Restore dependencies
+      run: dotnet restore
+    - name: Build
+      run: dotnet build --no-restore --configuration Release
+    - name: Test
+      env:
+        Jwt__Key: ${{ secrets.JWT_KEY }}
+        Jwt__Issuer: ${{ secrets.JWT_ISSUER }}
+        Jwt__Audience: ${{ secrets.JWT_AUDIENCE }}
+        EmailSettings__Password: ${{ secrets.SMTP_PASSWORD }}
+      run: dotnet test --no-build --configuration Release --verbosity normal
+  
