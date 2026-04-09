@@ -11,7 +11,7 @@ public class AuthControllerTests : IClassFixture<CustomWebApplicationFactory>
         _client = factory.CreateClient();
     }
     [Fact]
-    public async Task Register_ValidUser_Returns200()
+    public async Task Register_ValidUser_Returns201()
     {
         // Arrange
         var request = new RegisterRequest
@@ -24,7 +24,7 @@ public class AuthControllerTests : IClassFixture<CustomWebApplicationFactory>
         // Act
         var response = await _client.PostAsJsonAsync("/api/Auth/register", request);
         // Assert
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<BaseResponse<UserDto>>();
         Assert.True(body?.Success);
         Assert.Equal(request.Email, body?.Data?.Email);

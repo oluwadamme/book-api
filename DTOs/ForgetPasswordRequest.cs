@@ -1,6 +1,7 @@
+using System.ComponentModel.DataAnnotations;
 namespace FirstApi.DTOs;
 
 public class ForgetPasswordRequest
 {
-    public string Email { get; set; }
+    [Required, EmailAddress] public string Email { get; set; }
 }

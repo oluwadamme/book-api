@@ -1,13 +1,12 @@
 using Moq;
-using Xunit;
 using FirstApi.Services;
 using FirstApi.Models;
-using FirstApi.Data;
 using FirstApi.DTOs;
 using FirstApi.Repositories.Interfaces;
 using FirstApi.Services.Interfaces;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
+using FirstApi.Options;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace FirstApi.Tests.UnitTests.Services;
 
@@ -15,15 +14,19 @@ public class AuthServiceTests
 {
     private readonly Mock<IAuthRepository> _mockAuthRepository;
     private readonly Mock<IEmailService> _mockEmailService;
-    private readonly Mock<IConfiguration> _mockConfiguration;
+    private readonly Mock<ILogger<AuthService>> _mockLogger;
+    private readonly Mock<IOptions<EmailVerificationOptions>> _mockEmailOptions;
+    private readonly Mock<IOptions<JwtOptions>> _mockJwtOptions;
     private readonly AuthService _authService;
 
     public AuthServiceTests()
     {
         _mockAuthRepository = new Mock<IAuthRepository>();
         _mockEmailService = new Mock<IEmailService>();
-        _mockConfiguration = new Mock<IConfiguration>();
-        _authService = new AuthService(_mockAuthRepository.Object,_mockConfiguration.Object, _mockEmailService.Object);
+        _mockLogger = new Mock<ILogger<AuthService>>();
+        _mockEmailOptions = new Mock<IOptions<EmailVerificationOptions>>();
+        _mockJwtOptions = new Mock<IOptions<JwtOptions>>();
+        _authService = new AuthService(_mockAuthRepository.Object, _mockEmailService.Object, _mockLogger.Object, _mockEmailOptions.Object, _mockJwtOptions.Object);
     }
 
     [Fact]
@@ -41,10 +44,11 @@ public class AuthServiceTests
         // Mock: user does not already exist
         _mockAuthRepository.Setup(s => s.ExistsByEmailAsync(request.Email)).ReturnsAsync(false);
 
-        // Mock: IConfiguration for EmailVerification expiry
-        var mockSection = new Mock<IConfigurationSection>();
-        mockSection.Setup(s => s["ExpirationInMinutes"]).Returns("30");
-        _mockConfiguration.Setup(c => c.GetSection("EmailVerification")).Returns(mockSection.Object);
+        // Mock: IOptions<EmailVerificationOptions>
+        _mockEmailOptions.Setup(o => o.Value).Returns(new EmailVerificationOptions
+        {
+            ExpirationInMinutes = 30
+        });
 
         // Mock: AddUserAsync accepts any User (returns Task)
         _mockAuthRepository.Setup(s => s.AddUserAsync(It.IsAny<User>())).Returns(Task.CompletedTask);
@@ -110,14 +114,15 @@ public class AuthServiceTests
         // Mock: user exists
         _mockAuthRepository.Setup(s => s.GetUserByEmailAsync(request.Email)).ReturnsAsync(user);
 
-        // Mock: IConfiguration for JWT settings
-        var mockJwtSection = new Mock<IConfigurationSection>();
-        mockJwtSection.Setup(s => s["Key"]).Returns("ThisIsASecretKeyForTestingPurposes123!");
-        mockJwtSection.Setup(s => s["ExpirationInMinutes"]).Returns("60");
-        mockJwtSection.Setup(s => s["RefreshTokenExpirationInDays"]).Returns("30");
-        mockJwtSection.Setup(s => s["Issuer"]).Returns("TestIssuer");
-        mockJwtSection.Setup(s => s["Audience"]).Returns("TestAudience");
-        _mockConfiguration.Setup(c => c.GetSection("Jwt")).Returns(mockJwtSection.Object);
+        // Mock: IOptions<JwtOptions>
+        _mockJwtOptions.Setup(o => o.Value).Returns(new JwtOptions
+        {
+            Key = "ThisIsASecretKeyForTestingPurposes123!",
+            Issuer = "TestIssuer",
+            Audience = "TestAudience",
+            ExpirationInMinutes = 60,
+            RefreshTokenExpirationInDays = 30
+        });
 
         // Act
         var result = await _authService.LoginUserAsync(request);

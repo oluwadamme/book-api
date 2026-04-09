@@ -9,6 +9,7 @@ using FirstApi.Repositories.Interfaces;
 using FirstApi.Middleware;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
+using FirstApi.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,6 +23,9 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IAuthRepository, AuthRepository>();
 builder.Services.AddScoped<IBookRepository, BookRepository>();
 builder.Services.AddScoped<IBookService, BookService>();
+
+builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
+builder.Services.Configure<EmailVerificationOptions>(builder.Configuration.GetSection("EmailVerification"));
 
 builder.Services.AddAuthentication("Bearer").AddJwtBearer(options =>
 {
