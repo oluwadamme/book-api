@@ -10,6 +10,8 @@ using FirstApi.Middleware;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
 using FirstApi.Options;
+using FluentValidation;
+using FluentValidation.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +19,11 @@ var builder = WebApplication.CreateBuilder(args);
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 builder.Services.AddControllers();
+
+// 1. Tell ASP.NET Core to auto-validate requests using FluentValidation
+builder.Services.AddFluentValidationAutoValidation();
+// 2. Tell DI to scan your project and register RegisterRequestValidator (and any others you make)
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
@@ -26,6 +33,7 @@ builder.Services.AddScoped<IBookService, BookService>();
 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
 builder.Services.Configure<EmailVerificationOptions>(builder.Configuration.GetSection("EmailVerification"));
+
 
 builder.Services.AddAuthentication("Bearer").AddJwtBearer(options =>
 {

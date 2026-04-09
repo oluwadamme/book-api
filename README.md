@@ -650,9 +650,9 @@ Passwords must meet all of the following criteria:
 - [x] Implement **global error handling middleware**
 - [x] Add **rate limiting** to prevent brute-force attacks
 - [x] Set up **CI/CD** with GitHub Actions
-- [ ] Add **API versioning**
-- [ ] Refactor to **Clean Architecture** — introduce a proper Domain layer and separate Application, Infrastructure concerns; decouple business logic from data access
-- [ ] Add **CQRS with MediatR** — separate read (queries) from write (commands) operations for cleaner, testable handlers
+- [ ] Add **API versioning** (to be done later)
+- [ ] Refactor to **Clean Architecture** — introduce a proper Domain layer and separate Application, Infrastructure concerns; decouple business logic from data access (to be done later)
+- [ ] Add **CQRS with MediatR** — separate read (queries) from write (commands) operations for cleaner, testable handlers (to be done later)
 - [ ] Replace manual validation with **FluentValidation** — cleaner, reusable validation rules that integrate with the DI container
 - [ ] Add **caching** — implement IMemoryCache on frequently read endpoints (e.g. GET /api/Books) and Redis for multi-instance support
 - [ ] Add **Hangfire** for proper background job processing — move fire-and-forget email sending to a persistent, retriable job queue
