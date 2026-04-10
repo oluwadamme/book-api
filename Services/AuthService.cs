@@ -12,7 +12,7 @@ using FirstApi.Repositories.Interfaces;
 using Hangfire;
 namespace FirstApi.Services;
 
-public class AuthService(IAuthRepository authRepository, IEmailService emailService, ILogger<AuthService> logger, IOptions<EmailVerificationOptions> emailOptions, IOptions<JwtOptions> jwtOptions) : IAuthService
+public class AuthService(IAuthRepository authRepository, IOptions<EmailVerificationOptions> emailOptions, IOptions<JwtOptions> jwtOptions) : IAuthService
 {
     public async Task<UserDto> RegisterUserAsync(RegisterRequest request)
     {
@@ -196,18 +196,30 @@ public class AuthService(IAuthRepository authRepository, IEmailService emailServ
         //     throw new ArgumentException("Email not verified. Please verify your email to login.");
         // }
 
-        var token = GenerateJwtToken(user);
-        var refreshToken = GenerateRefreshToken();
-        var refreshTokenExpiry = DateTime.UtcNow.AddDays(jwtOptions.Value.RefreshTokenExpirationInDays);
-        user.RefreshToken = refreshToken;
-        user.RefreshTokenExpiry = refreshTokenExpiry;
-        await authRepository.UpdateUserAsync(user);
+        var newFamilyId = Guid.NewGuid().ToString(); // Generate a brand new Family ID
 
+        var token = GenerateJwtToken(user);
+        var refreshTokenString = GenerateRefreshToken();
+        var refreshTokenExpiry = DateTime.UtcNow.AddDays(jwtOptions.Value.RefreshTokenExpirationInDays);
+
+
+        var refreshTokenEntity = new RefreshToken
+        {
+            UserId = user.Id,
+            Token = refreshTokenString,
+            FamilyId = newFamilyId,
+            CreatedOn = DateTime.UtcNow,
+            ExpiresOn = refreshTokenExpiry,
+            IsUsed = false,
+            IsRevoked = false
+        };
+        await authRepository.UpdateUserAsync(user);
+        await authRepository.SaveRefreshTokenAsync(refreshTokenEntity);
         return new AuthResponse
         {
             Token = token,
             Id = user.Id,
-            RefreshToken = refreshToken,
+            RefreshToken = refreshTokenString,
             FirstName = user.FirstName,
             LastName = user.LastName,
             Email = user.Email,
@@ -222,21 +234,39 @@ public class AuthService(IAuthRepository authRepository, IEmailService emailServ
     public async Task<AuthResponse> RefreshTokenAsync(RefreshTokenRequest request)
     {
         var oldRefreshToken = request.RefreshToken;
-        if (oldRefreshToken == null)
+        // 1. Get the actual token entity from the database
+        var tokenEntity = await authRepository.GetRefreshTokenEntityAsync(oldRefreshToken!);
+        if (tokenEntity == null || tokenEntity.ExpiresOn < DateTime.UtcNow)
         {
-            throw new UnauthorizedAccessException("Refresh token is required");
+            throw new UnauthorizedAccessException("Invalid refresh token");
         }
-        var user = await authRepository.GetUserByRefreshTokenAsync(oldRefreshToken);
-        if (user == null || user.RefreshTokenExpiry < DateTime.UtcNow)
+
+        if (tokenEntity.IsUsed || tokenEntity.IsRevoked)
+        {
+            await authRepository.RevokeTokenFamilyAsync(tokenEntity.FamilyId);
+            throw new UnauthorizedAccessException("Invalid refresh token");
+        }
+        tokenEntity.IsUsed = true;
+        await authRepository.UpdateRefreshTokenAsync(tokenEntity);
+        var user = await authRepository.GetUserByIdAsync(tokenEntity.UserId);
+        if (user == null)
         {
             throw new UnauthorizedAccessException("Invalid refresh token");
         }
         var token = GenerateJwtToken(user);
         var newRefreshToken = GenerateRefreshToken();
         var refreshTokenExpiry = DateTime.UtcNow.AddDays(jwtOptions.Value.RefreshTokenExpirationInDays);
-        user.RefreshToken = newRefreshToken;
-        user.RefreshTokenExpiry = refreshTokenExpiry;
-        await authRepository.UpdateUserAsync(user);
+        var newRefreshTokenEntity = new RefreshToken
+        {
+            UserId = tokenEntity.UserId,
+            Token = newRefreshToken,
+            FamilyId = tokenEntity.FamilyId, // Important: Carry the family forward!
+            CreatedOn = DateTime.UtcNow,
+            ExpiresOn = refreshTokenExpiry,
+            IsUsed = false,
+            IsRevoked = false
+        };
+        await authRepository.SaveRefreshTokenAsync(newRefreshTokenEntity);
         return new AuthResponse
         {
             Token = token,
@@ -291,6 +321,7 @@ public class AuthService(IAuthRepository authRepository, IEmailService emailServ
         return Convert.ToBase64String(randomBytes);
     }
 
+
     public async Task<bool> RevokeRefreshTokenAsync(RefreshTokenRequest request)
     {
         var oldRefreshToken = request.RefreshToken;
@@ -298,15 +329,19 @@ public class AuthService(IAuthRepository authRepository, IEmailService emailServ
         {
             throw new UnauthorizedAccessException("Refresh token is required");
         }
-        var user = await authRepository.GetUserByRefreshTokenAsync(oldRefreshToken);
-        if (user != null)
+        var tokenEntity = await authRepository.GetRefreshTokenEntityAsync(oldRefreshToken!);
+        if (tokenEntity == null || tokenEntity.ExpiresOn < DateTime.UtcNow)
         {
-            user.RefreshToken = null;
-            user.RefreshTokenExpiry = null;
-            await authRepository.UpdateUserAsync(user);
-            return true;
+            throw new UnauthorizedAccessException("Invalid refresh token");
         }
-        return false;
+        if (tokenEntity.IsUsed || tokenEntity.IsRevoked)
+        {
+            await authRepository.RevokeTokenFamilyAsync(tokenEntity.FamilyId);
+            throw new UnauthorizedAccessException("Invalid refresh token");
+        }
+        tokenEntity.IsRevoked = true;
+        await authRepository.UpdateRefreshTokenAsync(tokenEntity);
+        return true;
     }
 
 }

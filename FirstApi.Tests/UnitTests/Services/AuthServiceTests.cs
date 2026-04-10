@@ -13,8 +13,6 @@ namespace FirstApi.Tests.UnitTests.Services;
 public class AuthServiceTests
 {
     private readonly Mock<IAuthRepository> _mockAuthRepository;
-    private readonly Mock<IEmailService> _mockEmailService;
-    private readonly Mock<ILogger<AuthService>> _mockLogger;
     private readonly Mock<IOptions<EmailVerificationOptions>> _mockEmailOptions;
     private readonly Mock<IOptions<JwtOptions>> _mockJwtOptions;
     private readonly AuthService _authService;
@@ -22,11 +20,10 @@ public class AuthServiceTests
     public AuthServiceTests()
     {
         _mockAuthRepository = new Mock<IAuthRepository>();
-        _mockEmailService = new Mock<IEmailService>();
-        _mockLogger = new Mock<ILogger<AuthService>>();
+
         _mockEmailOptions = new Mock<IOptions<EmailVerificationOptions>>();
         _mockJwtOptions = new Mock<IOptions<JwtOptions>>();
-        _authService = new AuthService(_mockAuthRepository.Object, _mockEmailService.Object, _mockLogger.Object, _mockEmailOptions.Object, _mockJwtOptions.Object);
+        _authService = new AuthService(_mockAuthRepository.Object, _mockEmailOptions.Object, _mockJwtOptions.Object);
     }
 
     [Fact]
@@ -52,11 +49,6 @@ public class AuthServiceTests
 
         // Mock: AddUserAsync accepts any User (returns Task)
         _mockAuthRepository.Setup(s => s.AddUserAsync(It.IsAny<User>())).Returns(Task.CompletedTask);
-
-        // Mock: SendEmailAsync
-        _mockEmailService.Setup(s => s.SendEmailAsync(
-            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
-            .Returns(Task.CompletedTask);
 
         // Act
         var result = await _authService.RegisterUserAsync(request);

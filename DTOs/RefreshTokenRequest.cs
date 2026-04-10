@@ -4,6 +4,8 @@ namespace FirstApi.DTOs;
 public class RefreshTokenRequest
 {
     public string? RefreshToken { get; set; }
+    public string? FamilyId { get; set; }
+    public int? UserId { get; set; }
 }
 
 public class RefreshTokenRequestValidator : AbstractValidator<RefreshTokenRequest>
