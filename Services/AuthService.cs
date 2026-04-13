@@ -12,7 +12,7 @@ using FirstApi.Repositories.Interfaces;
 using Hangfire;
 namespace FirstApi.Services;
 
-public class AuthService(IAuthRepository authRepository, IOptions<EmailVerificationOptions> emailOptions, IOptions<JwtOptions> jwtOptions) : IAuthService
+public class AuthService(IAuthRepository authRepository, IOptions<EmailVerificationOptions> emailOptions, IOptions<JwtOptions> jwtOptions, IBackgroundJobClient backgroundJobClient) : IAuthService
 {
     public async Task<UserDto> RegisterUserAsync(RegisterRequest request)
     {
@@ -47,7 +47,7 @@ public class AuthService(IAuthRepository authRepository, IOptions<EmailVerificat
         };
 
         await authRepository.AddUserAsync(user);
-        BackgroundJob.Enqueue<IEmailService>(x =>
+        backgroundJobClient.Enqueue<IEmailService>(x =>
         x.SendEmailAsync(user.Email, user.FirstName, subject, body));
 
         return new UserDto
@@ -82,7 +82,7 @@ public class AuthService(IAuthRepository authRepository, IOptions<EmailVerificat
         user.EmailVerificationToken = emailVerificationToken;
         user.EmailVerificationTokenExpiry = DateTime.UtcNow.AddMinutes(emailOptions.Value.ExpirationInMinutes);
         await authRepository.UpdateUserAsync(user);
-        BackgroundJob.Enqueue<IEmailService>(x =>
+        backgroundJobClient.Enqueue<IEmailService>(x =>
         x.SendEmailAsync(user.Email, user.FirstName, subject, body));
         return true;
     }
@@ -104,7 +104,7 @@ public class AuthService(IAuthRepository authRepository, IOptions<EmailVerificat
         user.PasswordResetToken = passwordResetToken;
         user.PasswordResetTokenExpiry = DateTime.UtcNow.AddMinutes(expirationInMinutes);
         await authRepository.UpdateUserAsync(user);
-        BackgroundJob.Enqueue<IEmailService>(x =>
+        backgroundJobClient.Enqueue<IEmailService>(x =>
         x.SendEmailAsync(user.Email, user.FirstName, subject, body));
         return true;
     }

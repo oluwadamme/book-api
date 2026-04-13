@@ -3,10 +3,12 @@ using FirstApi.Services;
 using FirstApi.Models;
 using FirstApi.DTOs;
 using FirstApi.Repositories.Interfaces;
-using FirstApi.Services.Interfaces;
 using FirstApi.Options;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Hangfire;
+using Hangfire.Common;
+using Hangfire.States;
+
 
 namespace FirstApi.Tests.UnitTests.Services;
 
@@ -15,7 +17,9 @@ public class AuthServiceTests
     private readonly Mock<IAuthRepository> _mockAuthRepository;
     private readonly Mock<IOptions<EmailVerificationOptions>> _mockEmailOptions;
     private readonly Mock<IOptions<JwtOptions>> _mockJwtOptions;
+    private readonly Mock<IBackgroundJobClient> _mockBackgroundJobClient;
     private readonly AuthService _authService;
+
 
     public AuthServiceTests()
     {
@@ -23,8 +27,10 @@ public class AuthServiceTests
 
         _mockEmailOptions = new Mock<IOptions<EmailVerificationOptions>>();
         _mockJwtOptions = new Mock<IOptions<JwtOptions>>();
-        _authService = new AuthService(_mockAuthRepository.Object, _mockEmailOptions.Object, _mockJwtOptions.Object);
+        _mockBackgroundJobClient = new Mock<IBackgroundJobClient>();
+        _authService = new AuthService(_mockAuthRepository.Object, _mockEmailOptions.Object, _mockJwtOptions.Object, _mockBackgroundJobClient.Object);
     }
+
 
     [Fact]
     public async Task RegisterUserAsync_ValidUser_ReturnsUserDto()
@@ -60,6 +66,9 @@ public class AuthServiceTests
         Assert.Equal(request.LastName, result.LastName);
         Assert.False(result.IsEmailVerified);
         _mockAuthRepository.Verify(r => r.AddUserAsync(It.IsAny<User>()), Times.Once);
+        _mockBackgroundJobClient.Verify(x => x.Create(
+            It.Is<Job>(j => j.Method.Name == "SendEmailAsync"),
+            It.IsAny<IState>()), Times.Once);
     }
 
     [Fact]

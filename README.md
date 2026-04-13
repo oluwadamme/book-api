@@ -660,8 +660,8 @@ Passwords must meet all of the following criteria:
 - [x] Implement **Problem Details (RFC 7807)** — standardize error responses to the RFC format instead of the custom BaseResponse wrapper for errors
 - [x] Add **explicit LINQ queries** in repositories — replace implicit EF Core queries with explicit Where/Select/OrderBy chains for better readability and control
 - [x] Add **refresh token family tracking** — detect refresh token reuse attacks by invalidating an entire token family on suspicious reuse
-- [ ] Add **structured logging with Serilog** — replace ILogger with Serilog for structured, queryable logs with sinks (file, Seq, Application Insights)
-- [ ] Write **tests for BookService** — unit tests for business logic (ownership checks, not-found scenarios) are missing alongside the existing AuthService tests
+- [x] Add **structured logging with Serilog** — replace ILogger with Serilog for structured, queryable logs with sinks (file, Seq, Application Insights)
+- [x] Write **tests for BookService** — unit tests for business logic (ownership checks, not-found scenarios) are missing alongside the existing AuthService tests
 
 ---
 

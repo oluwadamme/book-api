@@ -126,4 +126,40 @@ public class BookServiceTests
         Assert.Equal(2025, result.YearPublished);
         Assert.Equal(5, result.UserId);  // UserId should NOT change
     }
+
+    [Fact]
+    public async Task UpdateBookAsync_NullBook_ThrowsArgumentException()
+    {
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => _bookService.UpdateBookAsync(1, null!, 5)
+        );
+    }
+
+    [Fact]
+    public async Task UpdateBookAsync_BookNotFound_ThrowsKeyNotFoundException()
+    {
+        // Arrange
+        _mockBookRepository.Setup(r => r.GetBookByIdAsync(1, 1)).ReturnsAsync((Book?)null);
+
+        // Act & Assert
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => _bookService.UpdateBookAsync(1, new Book { Title = "T", Author = "A" }, 1)
+        );
+    }
+
+    [Fact]
+    public async Task DeleteBookAsync_Successful_CallsRepositoryDelete()
+    {
+        // Arrange
+        var book = new Book { Id = 1, UserId = 1, Title = "Delete Me", Author = "A" };
+        _mockBookRepository.Setup(r => r.GetBookByIdAsync(1, 1)).ReturnsAsync(book);
+        _mockBookRepository.Setup(r => r.DeleteBookAsync(book)).Returns(Task.CompletedTask);
+
+        // Act
+        await _bookService.DeleteBookAsync(1, 1);
+
+        // Assert
+        _mockBookRepository.Verify(r => r.DeleteBookAsync(book), Times.Once);
+    }
 }

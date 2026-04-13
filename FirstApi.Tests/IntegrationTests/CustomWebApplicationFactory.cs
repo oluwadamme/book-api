@@ -4,6 +4,9 @@ using Microsoft.Extensions.DependencyInjection;
 using FirstApi.Data;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
+using Moq;
+using Hangfire;
+
 
 namespace FirstApi.Tests.IntegrationTests;
 public class CustomWebApplicationFactory : WebApplicationFactory<Program>
@@ -45,6 +48,10 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             var dbName = $"TestDb_{Guid.NewGuid()}";
             services.AddDbContext<FirstApiContext>(options =>
                 options.UseInMemoryDatabase(dbName));
+
+            // Add a mock background job client so AuthService can resolve it
+            var mockJobClient = new Mock<IBackgroundJobClient>();
+            services.AddSingleton(mockJobClient.Object);
         });
     }
 }
