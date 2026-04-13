@@ -15,7 +15,7 @@ public class AuthController(IAuthService authService) : ControllerBase
     {
         var user = await authService.RegisterUserAsync(request);
 
-        return Ok(BaseResponse<UserDto>.SuccessResponse("User registered successfully", user));
+        return CreatedAtAction(nameof(RegisterUser), new { id = user.Id }, BaseResponse<UserDto>.SuccessResponse("User registered successfully", user));
     }
     [EnableRateLimiting("AuthLimit")]
     [HttpPost("login")]

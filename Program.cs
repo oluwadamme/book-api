@@ -9,85 +9,140 @@ using FirstApi.Repositories.Interfaces;
 using FirstApi.Middleware;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
+using FirstApi.Options;
+using FluentValidation;
+using FluentValidation.AspNetCore;
+using Hangfire;
+using Hangfire.PostgreSql;
+using Serilog;
 
-var builder = WebApplication.CreateBuilder(args);
-
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
-builder.Services.AddControllers();
-
-builder.Services.AddScoped<IAuthService, AuthService>();
-builder.Services.AddScoped<IEmailService, EmailService>();
-builder.Services.AddScoped<IAuthRepository, AuthRepository>();
-builder.Services.AddScoped<IBookRepository, BookRepository>();
-builder.Services.AddScoped<IBookService, BookService>();
-
-builder.Services.AddAuthentication("Bearer").AddJwtBearer(options =>
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .WriteTo.File("logs/api-logs.json") // The File Sink!
+    .CreateLogger();
+try
 {
-    var jwtSettings = builder.Configuration.GetSection("Jwt");
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        ValidateIssuer = true,
-        ValidateAudience = true,
-        ValidateLifetime = true,
-        ValidateIssuerSigningKey = true,
-        ValidIssuer = jwtSettings["Issuer"],
-        ValidAudience = jwtSettings["Audience"],
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"]!))
-    };
-});
-builder.Services.AddAuthorization();
+    var builder = WebApplication.CreateBuilder(args);
+    builder.Host.UseSerilog(); // Tell .NET to use Serilog instead of the default logger
 
-builder.Services.AddDbContext<FirstApiContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-builder.Services.AddRateLimiter(options =>
-{
-    // If they get blocked, send back a 429 Too Many Requests
-    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-    // Define a strict policy named "AuthLimit"
-    options.AddFixedWindowLimiter("AuthLimit", config =>
+    // Add services to the container.
+    // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+    builder.Services.AddOpenApi();
+    builder.Services.AddControllers();
+
+    // 1. Tell ASP.NET Core to auto-validate requests using FluentValidation
+    builder.Services.AddFluentValidationAutoValidation();
+    // 2. Tell DI to scan your project and register RegisterRequestValidator (and any others you make)
+    builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+
+    builder.Services.AddScoped<IAuthService, AuthService>();
+    builder.Services.AddScoped<IEmailService, EmailService>();
+    builder.Services.AddScoped<IAuthRepository, AuthRepository>();
+    builder.Services.AddScoped<IBookRepository, BookRepository>();
+    builder.Services.AddScoped<IBookService, BookService>();
+
+    builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
+    builder.Services.Configure<EmailVerificationOptions>(builder.Configuration.GetSection("EmailVerification"));
+
+
+    builder.Services.AddAuthentication("Bearer").AddJwtBearer(options =>
     {
-        // Only allow 5 requests per IP address...
-        config.PermitLimit = 5;
-        // ...every 1 minute.
-        config.Window = TimeSpan.FromMinutes(1);
-        config.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-        // Don't queue extra requests, just block them instantly.
-        config.QueueLimit = 0;
+        var jwtSettings = builder.Configuration.GetSection("Jwt");
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtSettings["Issuer"],
+            ValidAudience = jwtSettings["Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"]!))
+        };
     });
-});
-var app = builder.Build();
+    builder.Services.AddAuthorization();
 
-// Automatically apply database migrations on startup
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<FirstApiContext>();
-    if (db.Database.IsRelational())
-        db.Database.Migrate();
-    else
-        db.Database.EnsureCreated();
+    builder.Services.AddDbContext<FirstApiContext>(options =>
+        options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+    builder.Services.AddRateLimiter(options =>
+    {
+        // If they get blocked, send back a 429 Too Many Requests
+        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+        // Define a strict policy named "AuthLimit"
+        options.AddFixedWindowLimiter("AuthLimit", config =>
+        {
+            // Only allow 5 requests per IP address...
+            config.PermitLimit = 5;
+            // ...every 1 minute.
+            config.Window = TimeSpan.FromMinutes(1);
+            config.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+            // Don't queue extra requests, just block them instantly.
+            config.QueueLimit = 0;
+        });
+    });
+
+    var isTesting = builder.Environment.IsEnvironment("Testing");
+
+    // Skip real Hangfire and server in testing environment
+    if (!isTesting)
+    {
+        // 1. Tell Hangfire to use your existing PostgreSQL database
+        builder.Services.AddHangfire(configuration => configuration
+            .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+            .UseSimpleAssemblyNameTypeSerializer()
+            .UseRecommendedSerializerSettings()
+            .UsePostgreSqlStorage(options => options.UseNpgsqlConnection(builder.Configuration.GetConnectionString("DefaultConnection"))));
+        // 2. Add the Hangfire Server (the background worker that processes jobs)
+        builder.Services.AddHangfireServer();
+    }
+
+
+    var app = builder.Build();
+    if (!isTesting)
+    {
+        app.UseHangfireDashboard();
+    }
+
+    // Automatically apply database migrations on startup (Skip in testing as we use In-Memory)
+    if (!isTesting)
+    {
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<FirstApiContext>();
+            if (db.Database.IsRelational())
+            {
+                db.Database.Migrate();
+            }
+        }
+    }
+
+    app.UseRateLimiter();
+    app.UseMiddleware<ExceptionMiddleware>();
+
+    app.UseAuthentication();   // ← BEFORE authorization
+    app.UseAuthorization();    // ← AFTER authentication
+
+
+    // Configure the HTTP request pipeline.
+    if (app.Environment.IsDevelopment())
+    {
+        app.MapOpenApi();
+    }
+
+    app.UseHttpsRedirection();
+
+    app.MapControllers();
+
+    app.Run();
 }
-
-app.UseRateLimiter();
-app.UseMiddleware<ExceptionMiddleware>();
-
-app.UseAuthentication();   // ← BEFORE authorization
-app.UseAuthorization();    // ← AFTER authentication
-
-
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+catch (Exception ex)
 {
-    app.MapOpenApi();
+    Log.Fatal(ex, "The application failed to start correctly");
 }
-
-app.UseHttpsRedirection();
-
-app.MapControllers();
-
-app.Run();
-
+finally
+{
+    Log.CloseAndFlush();
+}
 // Make Program accessible for integration tests (WebApplicationFactory<Program>)
 public partial class Program { }

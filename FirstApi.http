@@ -2,7 +2,7 @@
 @FirstApi_HostAddress = http://localhost:5001
 @email = adeniyidamilola246@gmail.com
 @token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkJlYXJlciJ9.eyJuYW1laWQiOiIxIiwiZW1haWwiOiJhZGVuaXlpZGFtaWxvbGEzOEBnbWFpbC5jb20iLCJnaXZlbl9uYW1lIjoiSmFtZXMiLCJmYW1pbHlfbmFtZSI6IkRvZXMiLCJuYmYiOjE3NzU1NzMzODEsImV4cCI6MTc3NTU3NDI4MSwiaWF0IjoxNzc1NTczMzgxLCJpc3MiOiJodHRwczovL2xvY2FsaG9zdDo3MDAwIiwiYXVkIjoiaHR0cHM6Ly9sb2NhbGhvc3Q6NzAwMCJ9.i4Pdm3lSGQsFGYU4EuLylnFzk-moorZndgLLs56VhvU
-@refreshToken = z8o8DqqMebuH0catoe0n7gVSY0FPDlIDZdfQYmufco9i/LkNCIVYpO9jxo7sERYWge4RE8+K2M7qvwDkApC2og==
+@refreshToken = BPfP8OteHc2pPpCbml9dbazo/u+jRbIe6dXaqWutApP7UrgjZnDra16ruCeFRsAfDhJaZo8YQGckGZpSa5tlrw==
 GET {{FirstApi_HostAddress}}/weatherforecast/
 Accept: application/json
 
@@ -64,7 +64,7 @@ POST {{FirstApi_HostAddress}}/api/auth/login
 Content-Type: application/json
 
 {
-  "email":"adeniyidamilola38@gmail.com",
+  "email":"dee3@mailinator.com",
   "password": "Test123!"
 }
 # "email": "john@example.com",
@@ -110,5 +110,5 @@ Content-Type: application/json
 
 {
     "email": "dee3@mailinator.com",
-    "token": "9639"
+    "token": "8588"
 }

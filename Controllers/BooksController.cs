@@ -42,18 +42,32 @@ namespace FirstApi.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<BaseResponse<Book>>> CreateBook(Book newBook)
+        public async Task<ActionResult<BaseResponse<Book>>> CreateBook(CreateBookRequest request)
         {
             var userId = GetUserId();
+            var newBook = new Book
+            {
+                Title = request.Title,
+                Author = request.Author,
+                YearPublished = request.YearPublished,
+
+            };
             var book = await bookService.AddBookAsync(newBook, userId);
             return CreatedAtAction(nameof(GetBook), new { id = book.Id }, BaseResponse<Book>.SuccessResponse("Book created successfully", book));
 
         }
 
         [HttpPut("{id}")]
-        public async Task<ActionResult<BaseResponse<string>>> UpdateBook(int id, Book book)
+        public async Task<ActionResult<BaseResponse<string>>> UpdateBook(int id, CreateBookRequest request)
         {
             var userId = GetUserId();
+            var book = new Book
+            {
+                Title = request.Title,
+                Author = request.Author,
+                YearPublished = request.YearPublished,
+
+            };
             await bookService.UpdateBookAsync(id, book, userId);
             return Ok(BaseResponse<string>.SuccessResponse("Book updated successfully", "Book updated successfully"));
 
@@ -64,7 +78,7 @@ namespace FirstApi.Controllers
         {
             var userId = GetUserId();
             await bookService.DeleteBookAsync(id, userId);
-            return Ok(BaseResponse<string>.SuccessResponse("Book deleted successfully", "Book deleted successfully"));
+            return NoContent();
 
         }
     }

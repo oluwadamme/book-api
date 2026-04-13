@@ -22,7 +22,6 @@ A RESTful Web API built with **ASP.NET Core (.NET 10)** that provides full CRUD 
 - [Authentication Flow](#authentication-flow)
 - [Request & Response Examples](#request--response-examples)
 - [Password Requirements](#password-requirements)
-- [Seed Data](#seed-data)
 - [Configuration](#configuration)
 - [Potential Improvements](#potential-improvements)
 - [License](#license)
@@ -34,22 +33,23 @@ A RESTful Web API built with **ASP.NET Core (.NET 10)** that provides full CRUD 
 - **Rate Limiting** — Fixed window rate limiter configured to protect Authentication endpoints from brute-force attacks.
 - **JWT Authentication** — Secure register/login endpoints with BCrypt password hashing and JWT token generation.
 - **Refresh Tokens** — Long-lived refresh tokens with rotation for seamless token renewal without re-authentication.
-- **Email Verification** — OTP-based email verification on registration via SMTP (MailKit). Emails are sent fire-and-forget for fast responses.
+- **Email Verification** — OTP-based email verification on registration via SMTP (MailKit). Emails are sent fire-and-forget with error logging on failure.
 - **Password Reset** — Forgot password and reset password flow with time-limited OTP tokens.
 - **Protected Routes** — Books API requires a valid Bearer token to access.
 - **Ownership-Based Access** — Users can only view, edit, and delete books they created.
 - **Full CRUD API** — Create, Read, Update, and Delete book records.
 - **Service/Repository Pattern** — Clean layered architecture separating HTTP handling (controllers), business logic (services), and data access (repositories). All layers communicate through interfaces for testability and loose coupling.
-- **Input Validation** — Email and password validation with strong password requirements.
+- **Input Validation** — Data annotations (`[Required]`, `[EmailAddress]`, `[MinLength]`) on all request DTOs enforce validation automatically before reaching the service layer.
 - **Standardized Responses** — All endpoints return a consistent `BaseResponse<T>` wrapper with `success`, `message`, and `data` fields.
 - **Global Error Handling** — Centralized middleware maps exceptions to HTTP status codes, removing repetitive try/catch blocks across controllers.
 - **Structured Logging** — `ILogger<T>` used centrally in error handling and services for structured error and info logging.
+- **Strongly-Typed Configuration** — JWT and email settings are bound to typed options classes (`JwtOptions`, `EmailVerificationOptions`) instead of raw string parsing.
 - **Entity Framework Core** — Code-first approach with migrations for database schema management.
-- **PostgreSQL** — Configured to use PostgreSQL as the relational database.
-- **Seed Data** — Automatically populates the database with sample books on initial migration.
+- **PostgreSQL** — Configured to use PostgreSQL as the relational database. FK relationship between `Book` and `User` with cascade delete.
 - **OpenAPI / Swagger** — Auto-generated API documentation available in development mode.
 - **Async Operations** — All database operations are fully asynchronous.
 - **Automated Testing** — Unit tests (xUnit + Moq) for service-layer business logic and integration tests using `WebApplicationFactory` with an in-memory database.
+- **CI/CD** — GitHub Actions workflow runs build and tests on every push to `develop` and pull request to `main`.
 
 ---
 
@@ -78,13 +78,14 @@ A RESTful Web API built with **ASP.NET Core (.NET 10)** that provides full CRUD 
 ```
 FirstApi/
 ├── Controllers/
-│   ├── AuthController.cs              # Auth endpoints (register, login, verify, reset, refresh)
+│   ├── AuthController.cs              # Auth endpoints (register, login, verify, reset, refresh, logout)
 │   └── BooksController.cs             # Books CRUD endpoints (protected, ownership-based)
 ├── Data/
-│   └── FirstApiContext.cs             # EF Core DbContext with seed data & User config
+│   └── FirstApiContext.cs             # EF Core DbContext with FK config
 ├── DTOs/
 │   ├── AuthResponse.cs                # Login response (token, refresh token, user info, expiration)
 │   ├── BaseResponse.cs                # Generic API response wrapper
+│   ├── CreateBookRequest.cs           # Create/update book request body (title, author, yearPublished)
 │   ├── ForgetPasswordRequest.cs       # Forgot password request body
 │   ├── LoginRequest.cs                # Login request body
 │   ├── RefreshTokenRequest.cs         # Refresh token request body
@@ -97,6 +98,9 @@ FirstApi/
 ├── Models/
 │   ├── Books.cs                       # Book entity (linked to User via UserId)
 │   └── User.cs                        # User entity with verification, reset & refresh token fields
+├── Options/
+│   ├── JwtOptions.cs                  # Strongly-typed JWT configuration
+│   └── EmailVerificationOptions.cs    # Strongly-typed email verification configuration
 ├── Repositories/
 │   ├── Interfaces/
 │   │   ├── IAuthRepository.cs         # Auth data access contract
@@ -114,13 +118,17 @@ FirstApi/
 ├── FirstApi.Tests/
 │   ├── UnitTests/
 │   │   ├── Services/
-│   │   │   └── AuthServiceTests.cs    # Unit tests for AuthService (Moq-based)
+│   │   │   ├── AuthServiceTests.cs    # Unit tests for AuthService (Moq-based)
+│   │   │   └── BookServiceTests.cs    # Unit tests for BookService (Moq-based)
 │   │   └── Repositories/
 │   │       └── BookRepositoryTests.cs # Unit tests for BookRepository (InMemory DB)
 │   ├── IntegrationTests/
 │   │   ├── CustomWebApplicationFactory.cs  # Test server factory (InMemory DB + config)
 │   │   └── AuthControllerTests.cs     # Integration tests for Auth endpoints
 │   └── FirstApi.Tests.csproj          # Test project file
+├── .github/
+│   └── workflows/
+│       └── bookapi.yml                # CI workflow (build + test on push/PR)
 ├── Properties/
 │   └── launchSettings.json            # Launch/debug profiles
 ├── appsettings.json                   # App configuration (DB, JWT, SMTP settings)
@@ -182,7 +190,8 @@ Create an `appsettings.json` file in the project root:
     "Issuer": "https://localhost:7000",
     "Audience": "https://localhost:7000",
     "Key": "YourSuperSecretKeyThatIsAtLeast32CharactersLong!",
-    "ExpirationInMinutes": 60
+    "ExpirationInMinutes": 60,
+    "RefreshTokenExpirationInDays": 30
   },
   "EmailVerification": {
     "ExpirationInMinutes": 15
@@ -284,6 +293,7 @@ Base URL: `/api/Auth`
 | `POST` | `/api/Auth/resend-email-verification-token` | Resend verification OTP | ❌ No |
 | `POST` | `/api/Auth/forgot-password` | Request a password reset OTP | ❌ No |
 | `POST` | `/api/Auth/reset-password` | Reset password with OTP code | ❌ No |
+| `POST` | `/api/Auth/logout` | Revoke refresh token (invalidates session) | ❌ No |
 
 ### Books API (Protected — Ownership-Based)
 
@@ -305,19 +315,22 @@ Base URL: `/api/Books`
 
 ```
 1. Register → POST /api/Auth/register
-   └── Returns user info + sends verification OTP to email
+   └── Returns user info (201 Created) + sends verification OTP to email
 
 2. Verify Email → POST /api/Auth/verify-email
    └── Submit OTP from email to verify account
 
 3. Login → POST /api/Auth/login
-   └── Returns JWT token (15 min) + refresh token (30 days)
+   └── Returns JWT token (60 min) + refresh token (30 days)
 
 4. Access protected routes → GET /api/Books
    └── Include header: Authorization: Bearer <your-token>
 
 5. Token expires → POST /api/Auth/refresh-token
    └── Send refresh token → get new JWT + new refresh token (rotation)
+
+6. Logout → POST /api/Auth/logout
+   └── Send refresh token → revokes it server-side (invalidates session)
 ```
 
 ### Password Reset Flow
@@ -348,7 +361,7 @@ Content-Type: application/json
 }
 ```
 
-**Response** `200 OK`:
+**Response** `201 Created`:
 ```json
 {
   "success": true,
@@ -495,6 +508,26 @@ Content-Type: application/json
 }
 ```
 
+### Logout
+
+```http
+POST /api/Auth/logout
+Content-Type: application/json
+
+{
+  "refreshToken": "a8Kx9mN2pQ7..."
+}
+```
+
+**Response** `200 OK`:
+```json
+{
+  "success": true,
+  "message": "Logged out successfully",
+  "data": true
+}
+```
+
 ### Get All Books (owned by logged-in user)
 
 ```http
@@ -552,6 +585,15 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 > **Note:** `userId` is automatically set from your JWT token — you don't need to include it in the request body.
 
+### Delete a Book
+
+```http
+DELETE /api/Books/6
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**Response** `204 No Content`
+
 ### Error Response Example
 
 ```json
@@ -578,18 +620,6 @@ Passwords must meet all of the following criteria:
 
 ---
 
-## Seed Data
-
-The database is pre-populated with the following books when migrations are applied:
-
-| ID | Title | Author | Year Published |
-|---|---|---|---|
-| 1 | The Great Gatsby | F. Scott Fitzgerald | 1925 |
-| 2 | To Kill a Mockingbird | Harper Lee | 1960 |
-| 3 | 1984 | George Orwell | 1949 |
-
----
-
 ## Configuration
 
 | Setting | Location | Description |
@@ -598,7 +628,7 @@ The database is pre-populated with the following books when migrations are appli
 | JWT Secret Key | `appsettings.json` → `Jwt.Key` | Key used to sign JWT tokens (min 32 chars) |
 | JWT Issuer | `appsettings.json` → `Jwt.Issuer` | Token issuer for validation |
 | JWT Audience | `appsettings.json` → `Jwt.Audience` | Token audience for validation |
-| Token Expiry | `appsettings.json` → `Jwt.ExpirationInMinutes` | Access token lifetime in minutes (default: 15) |
+| Token Expiry | `appsettings.json` → `Jwt.ExpirationInMinutes` | Access token lifetime in minutes (default: 60) |
 | Refresh Token Expiry | `appsettings.json` → `Jwt.RefreshTokenExpirationInDays` | Refresh token lifetime in days (default: 30) |
 | SMTP Server | `appsettings.json` → `EmailSettings.SmtpServer` | Email server (e.g., `smtp.gmail.com`) |
 | SMTP Port | `appsettings.json` → `EmailSettings.SmtpPort` | SMTP port (587 for TLS) |
@@ -618,9 +648,20 @@ The database is pre-populated with the following books when migrations are appli
 - [x] Write **unit and integration tests** with xUnit
 - [x] Add **Docker support** with `docker-compose.yml`
 - [x] Implement **global error handling middleware**
-- [ ] Add **API versioning**
 - [x] Add **rate limiting** to prevent brute-force attacks
-- [ ] Set up **CI/CD** with GitHub Actions
+- [x] Set up **CI/CD** with GitHub Actions
+- [ ] Add **API versioning** (to be done later)
+- [ ] Refactor to **Clean Architecture** — introduce a proper Domain layer and separate Application, Infrastructure concerns; decouple business logic from data access (to be done later)
+- [ ] Add **CQRS with MediatR** — separate read (queries) from write (commands) operations for cleaner, testable handlers (to be done later)
+- [x] Replace manual validation with **FluentValidation** — cleaner, reusable validation rules that integrate with the DI container
+- [ ] Add **caching** — implement IMemoryCache on frequently read endpoints (e.g. GET /api/Books) and Redis for multi-instance support (to be done later)
+- [x] Add **Hangfire** for proper background job processing — move fire-and-forget email sending to a persistent, retriable job queue
+- [x] Add **ownership-based filtering at the repository level** — move the userId filter into BookRepository instead of BookService for cleaner separation
+- [x] Implement **Problem Details (RFC 7807)** — standardize error responses to the RFC format instead of the custom BaseResponse wrapper for errors
+- [x] Add **explicit LINQ queries** in repositories — replace implicit EF Core queries with explicit Where/Select/OrderBy chains for better readability and control
+- [x] Add **refresh token family tracking** — detect refresh token reuse attacks by invalidating an entire token family on suspicious reuse
+- [x] Add **structured logging with Serilog** — replace ILogger with Serilog for structured, queryable logs with sinks (file, Seq, Application Insights)
+- [x] Write **tests for BookService** — unit tests for business logic (ownership checks, not-found scenarios) are missing alongside the existing AuthService tests
 
 ---
 
